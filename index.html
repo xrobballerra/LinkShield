@@ -61,13 +61,13 @@
       padding: 24px;
       border-radius: 12px;
       font-family: monospace;
-      font-size: 48px;         /* ↑ Increased for readability */
+      font-size: 48px;
       text-align: center;
       margin: 20px 0;
-      letter-spacing: 12px;    /* ↑ More spacing */
+      letter-spacing: 12px;
       color: var(--gold);
       display: none;
-      box-shadow: 0 0 12px rgba(255,215,0,0.6); /* ✅ Glow for visibility */
+      box-shadow: 0 0 12px rgba(255,215,0,0.6);
       text-shadow: 0 0 8px rgba(255,215,0,0.8);
     }
     .code-instructions {
@@ -136,7 +136,7 @@
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
       document.getElementById('loading').style.display = 'flex';
-      document.getElementById('codeDisplay').style.display = 'none';
+      // ✅ Do NOT hide code display here — keep it visible
       document.getElementById('codeInstructions').style.display = 'none';
 
       try {
@@ -152,7 +152,7 @@
         window.__device_code = device_code;
         window.__interval = interval;
 
-        // ✅ Show code — BIG, SPACED, GLOWING
+        // ✅ Show code — and keep it visible
         document.getElementById('codeDisplay').textContent = user_code;
         document.getElementById('codeDisplay').style.display = 'block';
 
@@ -196,15 +196,15 @@
             localStorage.setItem('rd_client_id', client_id);
             localStorage.setItem('rd_client_secret', client_secret);
 
-            // ✅ Hide loading
+            // ✅ Hide loading only
             document.getElementById('loading').style.display = 'none';
 
-            // ✅ Show success IN UI (no alert!)
-            document.getElementById('codeDisplay').textContent = '✅ Paired!';
-            document.getElementById('codeDisplay').style.fontSize = '28px';
-            document.getElementById('codeDisplay').style.letterSpacing = '4px';
-            document.getElementById('codeDisplay').style.boxShadow = '0 0 10px rgba(74, 222, 128, 0.6)';
+            // ✅ Keep code visible — prepend ✅ instead of replacing
+            document.getElementById('codeDisplay').innerHTML = `
+              <span style="color: #4ade80; font-size: 32px;">✅</span> ${document.getElementById('codeDisplay').textContent}
+            `;
 
+            // ✅ Update instructions only
             document.getElementById('codeInstructions').innerHTML = `
               <div class="success-message">✅ Paired with Real-Debrid!</div>
               Now paste a link and click “CallCheck”.
