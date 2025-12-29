@@ -58,15 +58,17 @@
     .footer a { color: var(--gold); }
     .code-display {
       background: #000;
-      padding: 20px;
+      padding: 24px;
       border-radius: 12px;
       font-family: monospace;
-      font-size: 32px;
+      font-size: 48px;         /* ↑ Increased for readability */
       text-align: center;
       margin: 20px 0;
-      letter-spacing: 8px;
+      letter-spacing: 12px;    /* ↑ More spacing */
       color: var(--gold);
       display: none;
+      box-shadow: 0 0 12px rgba(255,215,0,0.6); /* ✅ Glow for visibility */
+      text-shadow: 0 0 8px rgba(255,215,0,0.8);
     }
     .code-instructions {
       font-size: 15px;
@@ -78,6 +80,12 @@
     .code-instructions a {
       color: var(--gold);
       text-decoration: none;
+    }
+    .success-message {
+      color: var(--green);
+      font-weight: bold;
+      font-size: 16px;
+      margin-top: 8px;
     }
   </style>
 </head>
@@ -123,7 +131,6 @@
     localStorage.removeItem('rd_client_secret');
 
     const CLIENT_ID = 'X245A4XAIBGVM';
-    // ✅ Working proxy — no encoding, no wrappers, tested live
     const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
 
     async function startPairing() {
@@ -133,7 +140,6 @@
       document.getElementById('codeInstructions').style.display = 'none';
 
       try {
-        // ✅ Raw URL — NO encoding needed for codetabs
         const rdUrl = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
         const res = await fetch(`${PROXY}${rdUrl}`);
         if (!res.ok) {
@@ -141,19 +147,17 @@
           throw new Error(`HTTP ${res.status}: ${text.substring(0, 80)}`);
         }
 
-        // ✅ Direct JSON — no .contents wrapper
         const { user_code, verification_url, device_code, interval } = await res.json();
 
-        // Save for polling
         window.__device_code = device_code;
         window.__interval = interval;
 
-        // ✅ Show 6-digit code
+        // ✅ Show code — BIG, SPACED, GLOWING
         document.getElementById('codeDisplay').textContent = user_code;
         document.getElementById('codeDisplay').style.display = 'block';
 
         document.getElementById('codeInstructions').innerHTML = `
-          ✅ <strong>${user_code}</strong> is your 6-digit pairing code.<br>
+          ✅ Your pairing code:<br>
           ➡️ Go to: <a href="${verification_url}" target="_blank">real-debrid.com/device</a><br>
           ➡️ Log in → Enter the code → Approve “LinkShield”
         `;
@@ -183,7 +187,6 @@
         }
 
         try {
-          // ✅ Raw URL — NO encoding
           const rdUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
           const res = await fetch(`${PROXY}${rdUrl}`);
           if (res.ok) {
@@ -193,11 +196,20 @@
             localStorage.setItem('rd_client_id', client_id);
             localStorage.setItem('rd_client_secret', client_secret);
 
+            // ✅ Hide loading
             document.getElementById('loading').style.display = 'none';
+
+            // ✅ Show success IN UI (no alert!)
+            document.getElementById('codeDisplay').textContent = '✅ Paired!';
+            document.getElementById('codeDisplay').style.fontSize = '28px';
+            document.getElementById('codeDisplay').style.letterSpacing = '4px';
+            document.getElementById('codeDisplay').style.boxShadow = '0 0 10px rgba(74, 222, 128, 0.6)';
+
+            document.getElementById('codeInstructions').innerHTML = `
+              <div class="success-message">✅ Paired with Real-Debrid!</div>
+              Now paste a link and click “CallCheck”.
+            `;
             document.getElementById('callCheckBtn').disabled = false;
-            document.getElementById('codeDisplay').style.display = 'none';
-            document.getElementById('codeInstructions').style.display = 'none';
-            alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
             return;
           }
         } catch (e) {
@@ -222,7 +234,7 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // Mock unrestrict (replace with real later)
+      // Mock unrestrict
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
         const url = 'https://stream.example.com/' + Date.now() + '.mp4';
