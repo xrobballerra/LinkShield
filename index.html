@@ -36,6 +36,7 @@
       border: none;
       margin-top: 10px;
     }
+    #loginBtn { background: #4ade80; }
     #loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; flex-direction: column; }
     .reel { width: 60px; height: 60px; border: 4px solid var(--gold); border-radius: 50%; animation: spin 2s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -49,6 +50,7 @@
     .copy-btn { background: #333; }
     .footer { margin-top: 40px; font-size: 13px; color: #666; }
     .footer a { color: var(--gold); }
+    .help { font-size: 12px; color: var(--gray); margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -57,8 +59,14 @@
     <p class="tagline">Skip ads, waits, and captchas. Turn file hoster links into instant HD streams — no extra software.</p>
 
     <div class="section">
-      <label>Your debrid service API key (e.g., Real-Debrid)</label>
-      <input type="password" id="rdKey" placeholder="rd_xxxx... or leave empty">
+      <button id="loginBtn" onclick="startOAuth()">🔐 Login with Real-Debrid (recommended)</button>
+      <p class="help">No key needed — secure & official</p>
+    </div>
+
+    <div class="section">
+      <label>Or enter your API key (advanced)</label>
+      <input type="password" id="rdKey" placeholder="rd_xxxx... (get at real-debrid.com/apitoken)">
+      <p class="help">⚠️ Private key — keep it safe</p>
     </div>
 
     <div class="section">
@@ -69,87 +77,124 @@
 
     <div id="loading">
       <div class="reel"></div>
-      <div class="reel-label">Scanning cache…</div>
+      <div class="reel-label" id="loadingText">Scanning cache…</div>
     </div>
 
     <div id="result"></div>
 
     <div class="footer">
-      <p>🔐 Your key stays in your browser. We never receive it.</p>
+      <p>🛡️ Your tokens stay in your browser. We never see them.</p>
       <p><a href="#" onclick="savePage()">📥 Save this page to run offline</a></p>
     </div>
   </div>
 
   <script>
-    async function startCheck() {
-      const link = document.getElementById('hosterLink').value.trim();
-      const rdKey = document.getElementById('rdKey').value.trim();
-      if (!link) { alert('⚠️ Enter a link'); return; }
+    const CLIENT_ID = 'X245A4XAIBGVM'; // RD's public client ID for open-source apps
+    const OAUTH_BASE = 'https://api.real-debrid.com/oauth/v2';
 
+    async function startOAuth() {
+      document.getElementById('loadingText').textContent = 'Getting code…';
       document.getElementById('loading').style.display = 'flex';
 
       try {
-        let result;
-        if (rdKey) {
-          // 🔐 Real mode: use Cloudflare Worker
-          const relayUrl = 'https://linkshield-relay.xrobballerra80.workers.dev';
-          const res = await fetch(relayUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ link, apikey: rdKey })
-          });
+        // Step 1: Get device code
+        const res1 = await fetch(`${OAUTH_BASE}/device/code?client_id=${CLIENT_ID}`);
+        if (!res1.ok) throw new Error('Failed to get device code');
+        const { device_code, user_code, verification_url, interval } = await res1.json();
 
-          const text = await res.text(); // Raw response for debugging
-          console.log('Worker raw response:', text);
+        // Show code to user
+        document.getElementById('loading').style.display = 'none';
+        if (!confirm(`🔐 Real-Debrid Login\n\n1. Go to: ${verification_url}\n2. Enter code: ${user_code}\n\nClick OK when done.`)) return;
 
-          if (!res.ok) {
-            throw new Error(`Worker error: ${res.status} ${res.statusText}`);
+        // Step 2: Poll for credentials
+        const maxWait = 5 * 60 * 1000; // 5 min
+        const startTime = Date.now();
+        
+        document.getElementById('loadingText').textContent = 'Waiting for approval…';
+        document.getElementById('loading').style.display = 'flex';
+
+        while (Date.now() - startTime < maxWait) {
+          await new Promise(r => setTimeout(r, interval * 1000));
+          
+          const res2 = await fetch(`${OAUTH_BASE}/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`);
+          if (res2.ok) {
+            const { client_id: cid, client_secret: secret } = await res2.json();
+            
+            // Step 3: Get access token
+            const formData = new URLSearchParams();
+            formData.append('client_id', cid);
+            formData.append('client_secret', secret);
+            formData.append('code', device_code);
+            formData.append('grant_type', 'http://oauth.net/grant_type/device/1.0');
+            
+            const res3 = await fetch(`${OAUTH_BASE}/token`, {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (res3.ok) {
+              const { access_token, refresh_token } = await res3.json();
+              localStorage.setItem('rd_token', access_token);
+              localStorage.setItem('rd_refresh', refresh_token);
+              document.getElementById('rdKey').value = access_token;
+              document.getElementById('loading').style.display = 'none';
+              alert('✅ Logged in! Your session is saved.');
+              return;
+            }
           }
-
-          let data;
-          try {
-            data = JSON.parse(text);
-          } catch (e) {
-            throw new Error('Invalid JSON from Worker: ' + text.substring(0, 100));
-          }
-
-          if (data.error) {
-            throw new Error(data.error);
-          }
-
-          // ✅ Critical: check if download exists
-          if (!data.download) {
-            throw new Error('No direct link. File may not be cached yet.');
-          }
-
-          result = {
-            stream: data.download,
-            cacheTime: data.cached_time ? `${data.cached_time}h` : 'fresh',
-            status: '✅ Real'
-          };
-        } else {
-          // 🎭 Mock mode
-          const url = 'https://stream.example.com/' + Date.now() + '.mp4';
-          result = {
-            stream: url,
-            cacheTime: '12h 34m',
-            status: '🎭 Mock'
-          };
         }
+        
+        throw new Error('Timed out. Try again.');
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        alert(`❌ ${e.message}`);
+      }
+    }
+
+    async function startCheck() {
+      const link = document.getElementById('hosterLink').value.trim();
+      let token = document.getElementById('rdKey').value.trim();
+      if (!link) { alert('⚠️ Enter a hoster link'); return; }
+      
+      if (!token) {
+        token = localStorage.getItem('rd_token');
+        if (!token) {
+          alert('🔒 Please log in first (click “Login with Real-Debrid”)');
+          return;
+        }
+      }
+
+      document.getElementById('loadingText').textContent = 'Scanning cache…';
+      document.getElementById('loading').style.display = 'flex';
+
+      try {
+        // Call Real-Debrid directly (user's IP → no ip_not_allowed)
+        const res = await fetch('https://api.real-debrid.com/rest/1.0/unrestrict/link', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `link=${encodeURIComponent(link)}`
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (!data.download) throw new Error('No direct link. File may not be cached.');
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('result').innerHTML = `
-          <div class="status">${result.status} — Cached (${result.cacheTime})</div>
-          <div class="stream-link">${result.stream}</div>
+          <div class="status">✅ Real — Cached (${data.cached_time || 'fresh'})</div>
+          <div class="stream-link">${data.download}</div>
           <div class="btn-group">
-            <div class="btn play-btn" onclick="window.open('${result.stream}', '_blank')">▶️ Play</div>
-            <div class="btn copy-btn" onclick="copy('${result.stream}')">📋 Copy</div>
+            <div class="btn play-btn" onclick="window.open('${data.download}', '_blank')">▶️ Play</div>
+            <div class="btn copy-btn" onclick="copy('${data.download}')">📋 Copy</div>
           </div>
         `;
         document.getElementById('result').style.display = 'block';
+
       } catch (err) {
         document.getElementById('loading').style.display = 'none';
-        console.error('CallCheck error:', err);
         alert(`❌ ${err.message}`);
       }
     }
@@ -159,7 +204,7 @@
     }
 
     function savePage() {
-      alert('✅ To save LinkShield:\n\n1. Right-click anywhere on this page → "Save as..."\n   (or press Ctrl+S / Cmd+S)\n2. Name it: "LinkShield.html"\n3. Double-click the file to run — no internet needed.');
+      alert('✅ To save LinkShield:\n\n1. Right-click → Save as…\n2. Name: LinkShield.html\n3. Double-click to run (UI works offline; internet needed for unrestrict)');
     }
   </script>
 </body>
