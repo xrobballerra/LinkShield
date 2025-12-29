@@ -131,7 +131,8 @@
     localStorage.removeItem('rd_client_secret');
 
     const CLIENT_ID = 'X245A4XAIBGVM';
-    const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
+    // ✅ Your private Vercel proxy
+    const PROXY = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
 
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
@@ -140,7 +141,8 @@
 
       try {
         const rdUrl = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
-        const res = await fetch(`${PROXY}${rdUrl}`);
+        const encodedUrl = encodeURIComponent(rdUrl);
+        const res = await fetch(`${PROXY}${encodedUrl}`);
         if (!res.ok) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text.substring(0, 80)}`);
@@ -187,7 +189,8 @@
 
         try {
           const rdUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
-          const res = await fetch(`${PROXY}${rdUrl}`);
+          const encodedUrl = encodeURIComponent(rdUrl);
+          const res = await fetch(`${PROXY}${encodedUrl}`);
           if (res.ok) {
             const { client_id, client_secret } = await res.json();
 
@@ -240,13 +243,16 @@
         const device_code = window.__device_code;
 
         // Step 1: Exchange device_code for access_token
+        const tokenUrl = `https://api.real-debrid.com/oauth/v2/token`;
+        const encodedTokenUrl = encodeURIComponent(tokenUrl);
+
         const formData = new URLSearchParams();
         formData.append('client_id', client_id);
         formData.append('client_secret', client_secret);
         formData.append('code', device_code);
         formData.append('grant_type', 'http://oauth.net/grant_type/device/1.0');
 
-        const tokenRes = await fetch(`${PROXY}https://api.real-debrid.com/oauth/v2/token`, {
+        const tokenRes = await fetch(`${PROXY}${encodedTokenUrl}`, {
           method: 'POST',
           body: formData
         });
@@ -259,7 +265,10 @@
         const { access_token } = await tokenRes.json();
 
         // Step 2: Unrestrict the link
-        const unrestrictRes = await fetch(`${PROXY}https://api.real-debrid.com/rest/1.0/unrestrict/link`, {
+        const unrestrictUrl = `https://api.real-debrid.com/rest/1.0/unrestrict/link`;
+        const encodedUnrestrictUrl = encodeURIComponent(unrestrictUrl);
+
+        const unrestrictRes = await fetch(`${PROXY}${encodedUnrestrictUrl}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${access_token}`,
