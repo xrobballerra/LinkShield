@@ -81,23 +81,53 @@
   </div>
 
   <script>
-    function startCheck() {
+    async function startCheck() {
       const link = document.getElementById('hosterLink').value.trim();
+      const rdKey = document.getElementById('rdKey').value.trim();
       if (!link) { alert('⚠️ Enter a link'); return; }
+
       document.getElementById('loading').style.display = 'flex';
-      setTimeout(() => {
+
+      try {
+        let result;
+        if (rdKey) {
+          // 🔐 Real mode: use Cloudflare Worker
+          const relayUrl = 'https://linkshield-relay.xrobballerra80.workers.dev';
+          const res = await fetch(relayUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ link, apikey: rdKey })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || 'Unrestrict failed');
+          result = {
+            stream: data.download,
+            cacheTime: data.cached_time ? `${data.cached_time}h` : 'fresh',
+            status: '✅ Real'
+          };
+        } else {
+          // 🎭 Mock mode
+          const url = 'https://stream.example.com/' + Date.now() + '.mp4';
+          result = {
+            stream: url,
+            cacheTime: '12h 34m',
+            status: '🎭 Mock'
+          };
+        }
         document.getElementById('loading').style.display = 'none';
-        const url = 'https://stream.example.com/' + Date.now() + '.mp4';
         document.getElementById('result').innerHTML = `
-          <div class="status">✅ Ready — Cached (12h 34m)</div>
-          <div class="stream-link">${url}</div>
+          <div class="status">${result.status} — Cached (${result.cacheTime})</div>
+          <div class="stream-link">${result.stream}</div>
           <div class="btn-group">
-            <div class="btn play-btn" onclick="alert('▶️ Playing...')">▶️ Play</div>
-            <div class="btn copy-btn" onclick="copy('${url}')">📋 Copy</div>
+            <div class="btn play-btn" onclick="window.open('${result.stream}', '_blank')">▶️ Play</div>
+            <div class="btn copy-btn" onclick="copy('${result.stream}')">📋 Copy</div>
           </div>
         `;
         document.getElementById('result').style.display = 'block';
-      }, 1500);
+      } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        alert(`❌ ${err.message}`);
+      }
     }
 
     function copy(url) {
