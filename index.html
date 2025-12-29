@@ -117,13 +117,14 @@
   </div>
 
   <script>
-    // 🔑 Reset local state for clean test
+    // 🔑 Reset state for clean test
     localStorage.removeItem('rd_paired');
     localStorage.removeItem('rd_client_id');
     localStorage.removeItem('rd_client_secret');
 
     const CLIENT_ID = 'X245A4XAIBGVM';
-    const PROXY = 'https://api.allorigins.win/get?url=';
+    // ✅ corsproxy.io — now with CORRECT URL encoding
+    const PROXY = 'https://corsproxy.io/?u=';
 
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
@@ -132,10 +133,11 @@
       document.getElementById('codeInstructions').style.display = 'none';
 
       try {
-        // ✅ Encode the full RD URL first
+        // ✅ Build RD URL
         const rdUrl = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
-        const encoded = encodeURIComponent(rdUrl);
-        const proxyUrl = `${PROXY}${encoded}`;
+        // ✅ Encode FULL URL (critical for corsproxy.io)
+        const encodedUrl = encodeURIComponent(rdUrl);
+        const proxyUrl = `${PROXY}${encodedUrl}`;
 
         const res = await fetch(proxyUrl);
         if (!res.ok) {
@@ -143,14 +145,8 @@
           throw new Error(`HTTP ${res.status}: ${text.substring(0, 80)}`);
         }
 
-        const data = await res.json();
-        if (!data || !data.contents) {
-          throw new Error('Proxy returned empty response');
-        }
-
-        // ✅ Parse the actual JSON inside contents
-        const payload = JSON.parse(data.contents);
-        const { user_code, verification_url, device_code, interval } = payload;
+        // ✅ Parse JSON directly (no .contents wrapper)
+        const { user_code, verification_url, device_code, interval } = await res.json();
 
         window.__device_code = device_code;
         window.__interval = interval;
@@ -180,7 +176,7 @@
       const device_code = window.__device_code;
       const interval = window.__interval || 5;
       let attempts = 0;
-      const maxAttempts = 60; // 5 min
+      const maxAttempts = 60;
 
       const poll = async () => {
         if (attempts >= maxAttempts) {
@@ -191,27 +187,23 @@
 
         try {
           const rdUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
-          const encoded = encodeURIComponent(rdUrl);
-          const proxyUrl = `${PROXY}${encoded}`;
+          const encodedUrl = encodeURIComponent(rdUrl);
+          const proxyUrl = `${PROXY}${encodedUrl}`;
 
           const res = await fetch(proxyUrl);
           if (res.ok) {
-            const data = await res.json();
-            if (data.contents) {
-              const payload = JSON.parse(data.contents);
-              const { client_id, client_secret } = payload;
+            const { client_id, client_secret } = await res.json();
 
-              localStorage.setItem('rd_paired', 'true');
-              localStorage.setItem('rd_client_id', client_id);
-              localStorage.setItem('rd_client_secret', client_secret);
+            localStorage.setItem('rd_paired', 'true');
+            localStorage.setItem('rd_client_id', client_id);
+            localStorage.setItem('rd_client_secret', client_secret);
 
-              document.getElementById('loading').style.display = 'none';
-              document.getElementById('callCheckBtn').disabled = false;
-              document.getElementById('codeDisplay').style.display = 'none';
-              document.getElementById('codeInstructions').style.display = 'none';
-              alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
-              return;
-            }
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('callCheckBtn').disabled = false;
+            document.getElementById('codeDisplay').style.display = 'none';
+            document.getElementById('codeInstructions').style.display = 'none';
+            alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
+            return;
           }
         } catch (e) {
           // ignore transient errors
@@ -235,7 +227,7 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // Mock unrestrict (replace with real later)
+      // Mock unrestrict
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
         const url = 'https://stream.example.com/' + Date.now() + '.mp4';
