@@ -117,7 +117,10 @@
   </div>
 
   <script>
-    const CLIENT_ID = 'X245A4XAIBGVM'; // RD's open-source client ID
+    // 🔑 Client ID for open-source apps (officially documented)
+    const CLIENT_ID = 'X245A4XAIBGVM';
+    // 🌐 CORS proxy (free, temporary — replace with your own later if needed)
+    const PROXY = 'https://cors-anywhere.herokuapp.com/';
     const OAUTH_BASE = 'https://api.real-debrid.com/oauth/v2';
 
     async function startPairing() {
@@ -125,18 +128,33 @@
       document.getElementById('loading').style.display = 'flex';
 
       try {
-        const res = await fetch(`${OAUTH_BASE}/device/code?client_id=${CLIENT_ID}`);
-        if (!res.ok) throw new Error('Failed to get pairing code');
-        const { user_code, verification_url } = await res.json();
+        // Step 1: Get device code via proxy
+        const url = `${OAUTH_BASE}/device/code?client_id=${CLIENT_ID}`;
+        const res = await fetch(PROXY + url, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest', // Required by cors-anywhere
+          }
+        });
 
-        // Show 6-digit code (e.g. ABCD-EF)
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
+        }
+
+        const { user_code, verification_url, device_code, interval } = await res.json();
+
+        // Save device_code for polling (in real app, keep in closure or memory)
+        window.__device_code = device_code;
+        window.__interval = interval;
+
+        // Show code
         document.getElementById('codeDisplay').textContent = user_code;
         document.getElementById('codeDisplay').style.display = 'block';
 
         document.getElementById('codeInstructions').innerHTML = `
-          ✅ <strong>${user_code}</strong> is your pairing code.<br>
+          ✅ <strong>${user_code}</strong> is your 6-digit pairing code.<br>
           ➡️ Go to: <a href="${verification_url}" target="_blank">real-debrid.com/device</a><br>
-          ➡️ Log in → Enter the code above → Approve “LinkShield”
+          ➡️ Log in → Enter the code → Approve “LinkShield”
         `;
         document.getElementById('codeInstructions').style.display = 'block';
 
@@ -148,49 +166,55 @@
 
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
-        alert(`❌ ${e.message}`);
+        alert(`❌ Failed to get code:\n${e.message}`);
+        console.error('Pairing error:', e);
       }
     }
 
     async function pollForApproval() {
+      const device_code = window.__device_code;
+      const interval = window.__interval || 5;
       let attempts = 0;
-      const maxAttempts = 60; // 5 min at 5s interval
+      const maxAttempts = 60; // 5 minutes
 
       const poll = async () => {
         if (attempts >= maxAttempts) {
           document.getElementById('loading').style.display = 'none';
+          alert('❌ Pairing timed out. Try again.');
           return;
         }
 
         try {
-          const res = await fetch(`${OAUTH_BASE}/device/credentials?client_id=${CLIENT_ID}`);
+          const url = `${OAUTH_BASE}/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
+          const res = await fetch(PROXY + url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+
           if (res.ok) {
             const { client_id, client_secret } = await res.json();
-            // In real flow, you'd get device_code from start — this is simplified for demo
-            // For production, pass device_code via closure or state
-            finalizePairing(client_id, client_secret);
+
+            // Simulate token exchange (for demo)
+            // In final: call /token with device_code to get access_token
+            localStorage.setItem('rd_paired', 'true');
+            localStorage.setItem('rd_client_id', client_id);
+            localStorage.setItem('rd_client_secret', client_secret);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('callCheckBtn').disabled = false;
+            document.getElementById('codeDisplay').style.display = 'none';
+            document.getElementById('codeInstructions').style.display = 'none';
+            alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
             return;
           }
         } catch (e) {
-          // ignore
+          // ignore network errors during polling
         }
 
         attempts++;
-        setTimeout(poll, 5000); // poll every 5s
+        setTimeout(poll, interval * 1000);
       };
 
       poll();
-    }
-
-    async function finalizePairing(client_id, client_secret) {
-      // In real app, you'd have device_code from startPairing
-      // For demo, we simulate success
-      localStorage.setItem('rd_paired', 'true');
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('callCheckBtn').disabled = false;
-      document.getElementById('codeDisplay').style.display = 'none';
-      document.getElementById('codeInstructions').style.display = 'none';
-      alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
     }
 
     async function startCheck() {
@@ -204,7 +228,7 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // For demo: mock success (in real app, call RD unrestrict with token)
+      // Mock unrestrict (replace with real call later)
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
         const url = 'https://stream.example.com/' + Date.now() + '.mp4';
@@ -212,7 +236,7 @@
           <div class="status">✅ Ready — Cached (12h 34m)</div>
           <div class="stream-link">${url}</div>
           <div class="btn-group">
-            <div class="btn play-btn" onclick="alert('▶️ Playing...')">▶️ Play</div>
+            <div class="btn play-btn" onclick="window.open('${url}', '_blank')">▶️ Play</div>
             <div class="btn copy-btn" onclick="copy('${url}')">📋 Copy</div>
           </div>
         `;
