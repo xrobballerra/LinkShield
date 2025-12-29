@@ -123,7 +123,8 @@
     localStorage.removeItem('rd_client_secret');
 
     const CLIENT_ID = 'X245A4XAIBGVM';
-    const PROXY = 'https://api.allorigins.win/get?url=';
+    // ✅ Updated proxy — corsproxy.io is stable and CORS-friendly
+    const PROXY = 'https://corsproxy.io/?u=';
 
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
@@ -133,14 +134,11 @@
 
       try {
         // Fetch device code via proxy
-        const rdUrl = encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`);
-        const res = await fetch(`${PROXY}${rdUrl}`);
+        const rdUrl = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
+        const res = await fetch(`${PROXY}${encodeURIComponent(rdUrl)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const data = await res.json();
-        if (!data.contents) throw new Error('Invalid response');
-
-        const { user_code, verification_url, device_code, interval } = JSON.parse(data.contents);
+        const { user_code, verification_url, device_code, interval } = await res.json();
 
         // Save for polling
         window.__device_code = device_code;
@@ -184,26 +182,23 @@
         }
 
         try {
-          const rdUrl = encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`);
-          const res = await fetch(`${PROXY}${rdUrl}`);
+          const rdUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
+          const res = await fetch(`${PROXY}${encodeURIComponent(rdUrl)}`);
           if (res.ok) {
-            const data = await res.json();
-            if (data.contents) {
-              const { client_id, client_secret } = JSON.parse(data.contents);
+            const { client_id, client_secret } = await res.json();
 
-              // Save pairing state
-              localStorage.setItem('rd_paired', 'true');
-              localStorage.setItem('rd_client_id', client_id);
-              localStorage.setItem('rd_client_secret', client_secret);
+            // Save pairing state
+            localStorage.setItem('rd_paired', 'true');
+            localStorage.setItem('rd_client_id', client_id);
+            localStorage.setItem('rd_client_secret', client_secret);
 
-              // ✅ Enable CallCheck
-              document.getElementById('loading').style.display = 'none';
-              document.getElementById('callCheckBtn').disabled = false;
-              document.getElementById('codeDisplay').style.display = 'none';
-              document.getElementById('codeInstructions').style.display = 'none';
-              alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
-              return;
-            }
+            // ✅ Enable CallCheck
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('callCheckBtn').disabled = false;
+            document.getElementById('codeDisplay').style.display = 'none';
+            document.getElementById('codeInstructions').style.display = 'none';
+            alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
+            return;
           }
         } catch (e) {
           // ignore transient errors
