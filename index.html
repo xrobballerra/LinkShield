@@ -104,7 +104,7 @@
     <!-- Hoster Link -->
     <div class="section">
       <label>Paste a hoster link</label>
-      <input type="text" id="hosterLink" value="https://uptobox.com/abc123">
+      <input type="text" id="hosterLink" value="https://uptobox.com/6x4r7q1n9m2p">
       <button onclick="startCheck()" id="callCheckBtn" disabled>CallCheck</button>
     </div>
 
@@ -136,7 +136,6 @@
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
       document.getElementById('loading').style.display = 'flex';
-      // ✅ Do NOT hide code display here — keep it visible
       document.getElementById('codeInstructions').style.display = 'none';
 
       try {
@@ -199,7 +198,7 @@
             // ✅ Hide loading only
             document.getElementById('loading').style.display = 'none';
 
-            // ✅ Keep code visible — prepend ✅ instead of replacing
+            // ✅ Keep code visible — prepend ✅
             document.getElementById('codeDisplay').innerHTML = `
               <span style="color: #4ade80; font-size: 32px;">✅</span> ${document.getElementById('codeDisplay').textContent}
             `;
@@ -234,20 +233,69 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // Mock unrestrict
-      setTimeout(() => {
+      try {
+        // Get stored credentials
+        const client_id = localStorage.getItem('rd_client_id');
+        const client_secret = localStorage.getItem('rd_client_secret');
+        const device_code = window.__device_code;
+
+        // Step 1: Exchange device_code for access_token
+        const formData = new URLSearchParams();
+        formData.append('client_id', client_id);
+        formData.append('client_secret', client_secret);
+        formData.append('code', device_code);
+        formData.append('grant_type', 'http://oauth.net/grant_type/device/1.0');
+
+        const tokenRes = await fetch(`${PROXY}https://api.real-debrid.com/oauth/v2/token`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!tokenRes.ok) {
+          const err = await tokenRes.json();
+          throw new Error(err.error || `Token: HTTP ${tokenRes.status}`);
+        }
+
+        const { access_token } = await tokenRes.json();
+
+        // Step 2: Unrestrict the link
+        const unrestrictRes = await fetch(`${PROXY}https://api.real-debrid.com/rest/1.0/unrestrict/link`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `link=${encodeURIComponent(link)}`
+        });
+
+        if (!unrestrictRes.ok) {
+          const err = await unrestrictRes.json();
+          throw new Error(err.error || `Unrestrict: HTTP ${unrestrictRes.status}`);
+        }
+
+        const data = await unrestrictRes.json();
+
+        if (!data.download) {
+          throw new Error('No direct link. File may not be cached.');
+        }
+
+        // ✅ Show REAL stream URL
         document.getElementById('loading').style.display = 'none';
-        const url = 'https://stream.example.com/' + Date.now() + '.mp4';
         document.getElementById('result').innerHTML = `
-          <div class="status">✅ Ready — Cached (12h 34m)</div>
-          <div class="stream-link">${url}</div>
+          <div class="status">✅ Real — Cached (${data.cached_time || 'fresh'})</div>
+          <div class="stream-link">${data.download}</div>
           <div class="btn-group">
-            <div class="btn play-btn" onclick="window.open('${url}', '_blank')">▶️ Play</div>
-            <div class="btn copy-btn" onclick="copy('${url}')">📋 Copy</div>
+            <div class="btn play-btn" onclick="window.open('${data.download}', '_blank')">▶️ Play</div>
+            <div class="btn copy-btn" onclick="copy('${data.download}')">📋 Copy</div>
           </div>
         `;
         document.getElementById('result').style.display = 'block';
-      }, 1500);
+
+      } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        alert(`❌ ${err.message}`);
+        console.error('CallCheck error:', err);
+      }
     }
 
     function copy(url) {
