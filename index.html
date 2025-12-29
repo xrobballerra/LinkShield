@@ -103,7 +103,7 @@
     <!-- Loading -->
     <div id="loading">
       <div class="reel"></div>
-      <div class="reel-label" id="loadingText">Connecting…</div>
+      <div class="reel-label" id="loadingText">Generating code…</div>
     </div>
 
     <!-- Result -->
@@ -117,20 +117,28 @@
   </div>
 
   <script>
-    const CLIENT_ID = 'X245A4XAIBGVM'; // RD's open-source client ID
+    // 🔑 Reset state on load (for clean testing)
+    localStorage.removeItem('rd_paired');
+    localStorage.removeItem('rd_client_id');
+    localStorage.removeItem('rd_client_secret');
+
+    const CLIENT_ID = 'X245A4XAIBGVM';
     const PROXY = 'https://api.allorigins.win/get?url=';
 
     async function startPairing() {
-      document.getElementById('loadingText').textContent = 'Getting code…';
+      document.getElementById('loadingText').textContent = 'Generating code…';
       document.getElementById('loading').style.display = 'flex';
+      document.getElementById('codeDisplay').style.display = 'none';
+      document.getElementById('codeInstructions').style.display = 'none';
 
       try {
+        // Fetch device code via proxy
         const rdUrl = encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`);
         const res = await fetch(`${PROXY}${rdUrl}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-        if (!data.contents) throw new Error('Invalid proxy response');
+        if (!data.contents) throw new Error('Invalid response');
 
         const { user_code, verification_url, device_code, interval } = JSON.parse(data.contents);
 
@@ -138,7 +146,7 @@
         window.__device_code = device_code;
         window.__interval = interval;
 
-        // Show 6-digit code
+        // ✅ Show 6-digit code — THIS IS THE KEY
         document.getElementById('codeDisplay').textContent = user_code;
         document.getElementById('codeDisplay').style.display = 'block';
 
@@ -149,9 +157,10 @@
         `;
         document.getElementById('codeInstructions').style.display = 'block';
 
+        // Auto-open RD device page
         window.open(verification_url, '_blank');
 
-        // Start polling
+        // Start polling for approval
         pollForApproval();
 
       } catch (e) {
@@ -182,10 +191,12 @@
             if (data.contents) {
               const { client_id, client_secret } = JSON.parse(data.contents);
 
+              // Save pairing state
               localStorage.setItem('rd_paired', 'true');
               localStorage.setItem('rd_client_id', client_id);
               localStorage.setItem('rd_client_secret', client_secret);
 
+              // ✅ Enable CallCheck
               document.getElementById('loading').style.display = 'none';
               document.getElementById('callCheckBtn').disabled = false;
               document.getElementById('codeDisplay').style.display = 'none';
@@ -216,7 +227,7 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // Mock unrestrict (replace with real later)
+      // Mock response (replace with real unrestrict later)
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
         const url = 'https://stream.example.com/' + Date.now() + '.mp4';
