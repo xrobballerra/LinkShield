@@ -117,37 +117,28 @@
   </div>
 
   <script>
-    // 🔑 Client ID for open-source apps (officially documented)
-    const CLIENT_ID = 'X245A4XAIBGVM';
-    // 🌐 CORS proxy (free, temporary — replace with your own later if needed)
-    const PROXY = 'https://cors-anywhere.herokuapp.com/';
-    const OAUTH_BASE = 'https://api.real-debrid.com/oauth/v2';
+    const CLIENT_ID = 'X245A4XAIBGVM'; // RD's open-source client ID
+    const PROXY = 'https://api.allorigins.win/get?url=';
 
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Getting code…';
       document.getElementById('loading').style.display = 'flex';
 
       try {
-        // Step 1: Get device code via proxy
-        const url = `${OAUTH_BASE}/device/code?client_id=${CLIENT_ID}`;
-        const res = await fetch(PROXY + url, {
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest', // Required by cors-anywhere
-          }
-        });
+        const rdUrl = encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`);
+        const res = await fetch(`${PROXY}${rdUrl}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`HTTP ${res.status}: ${text.substring(0, 100)}`);
-        }
+        const data = await res.json();
+        if (!data.contents) throw new Error('Invalid proxy response');
 
-        const { user_code, verification_url, device_code, interval } = await res.json();
+        const { user_code, verification_url, device_code, interval } = JSON.parse(data.contents);
 
-        // Save device_code for polling (in real app, keep in closure or memory)
+        // Save for polling
         window.__device_code = device_code;
         window.__interval = interval;
 
-        // Show code
+        // Show 6-digit code
         document.getElementById('codeDisplay').textContent = user_code;
         document.getElementById('codeDisplay').style.display = 'block';
 
@@ -158,7 +149,6 @@
         `;
         document.getElementById('codeInstructions').style.display = 'block';
 
-        // Auto-open RD device page
         window.open(verification_url, '_blank');
 
         // Start polling
@@ -166,7 +156,7 @@
 
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
-        alert(`❌ Failed to get code:\n${e.message}`);
+        alert(`❌ ${e.message}`);
         console.error('Pairing error:', e);
       }
     }
@@ -185,29 +175,27 @@
         }
 
         try {
-          const url = `${OAUTH_BASE}/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
-          const res = await fetch(PROXY + url, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-          });
-
+          const rdUrl = encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`);
+          const res = await fetch(`${PROXY}${rdUrl}`);
           if (res.ok) {
-            const { client_id, client_secret } = await res.json();
+            const data = await res.json();
+            if (data.contents) {
+              const { client_id, client_secret } = JSON.parse(data.contents);
 
-            // Simulate token exchange (for demo)
-            // In final: call /token with device_code to get access_token
-            localStorage.setItem('rd_paired', 'true');
-            localStorage.setItem('rd_client_id', client_id);
-            localStorage.setItem('rd_client_secret', client_secret);
+              localStorage.setItem('rd_paired', 'true');
+              localStorage.setItem('rd_client_id', client_id);
+              localStorage.setItem('rd_client_secret', client_secret);
 
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('callCheckBtn').disabled = false;
-            document.getElementById('codeDisplay').style.display = 'none';
-            document.getElementById('codeInstructions').style.display = 'none';
-            alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
-            return;
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('callCheckBtn').disabled = false;
+              document.getElementById('codeDisplay').style.display = 'none';
+              document.getElementById('codeInstructions').style.display = 'none';
+              alert('✅ Paired with Real-Debrid!\nNow paste a link and click “CallCheck”.');
+              return;
+            }
           }
         } catch (e) {
-          // ignore network errors during polling
+          // ignore transient errors
         }
 
         attempts++;
@@ -228,7 +216,7 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // Mock unrestrict (replace with real call later)
+      // Mock unrestrict (replace with real later)
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
         const url = 'https://stream.example.com/' + Date.now() + '.mp4';
