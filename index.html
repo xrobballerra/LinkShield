@@ -123,8 +123,8 @@
     localStorage.removeItem('rd_client_secret');
 
     const CLIENT_ID = 'X245A4XAIBGVM';
-    // ✅ corsproxy.io — now with CORRECT URL encoding
-    const PROXY = 'https://corsproxy.io/?u=';
+    // ✅ Working proxy — no encoding, no wrappers, tested live
+    const PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
 
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
@@ -133,21 +133,18 @@
       document.getElementById('codeInstructions').style.display = 'none';
 
       try {
-        // ✅ Build RD URL
+        // ✅ Raw URL — NO encoding needed for codetabs
         const rdUrl = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
-        // ✅ Encode FULL URL (critical for corsproxy.io)
-        const encodedUrl = encodeURIComponent(rdUrl);
-        const proxyUrl = `${PROXY}${encodedUrl}`;
-
-        const res = await fetch(proxyUrl);
+        const res = await fetch(`${PROXY}${rdUrl}`);
         if (!res.ok) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text.substring(0, 80)}`);
         }
 
-        // ✅ Parse JSON directly (no .contents wrapper)
+        // ✅ Direct JSON — no .contents wrapper
         const { user_code, verification_url, device_code, interval } = await res.json();
 
+        // Save for polling
         window.__device_code = device_code;
         window.__interval = interval;
 
@@ -186,11 +183,9 @@
         }
 
         try {
+          // ✅ Raw URL — NO encoding
           const rdUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
-          const encodedUrl = encodeURIComponent(rdUrl);
-          const proxyUrl = `${PROXY}${encodedUrl}`;
-
-          const res = await fetch(proxyUrl);
+          const res = await fetch(`${PROXY}${rdUrl}`);
           if (res.ok) {
             const { client_id, client_secret } = await res.json();
 
@@ -227,7 +222,7 @@
       document.getElementById('loadingText').textContent = 'Scanning cache…';
       document.getElementById('loading').style.display = 'flex';
 
-      // Mock unrestrict
+      // Mock unrestrict (replace with real later)
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
         const url = 'https://stream.example.com/' + Date.now() + '.mp4';
