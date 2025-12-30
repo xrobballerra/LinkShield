@@ -131,8 +131,8 @@
     localStorage.removeItem('rd_client_secret');
 
     const CLIENT_ID = 'X245A4XAIBGVM';
-    // ✅ Your private, working Vercel proxy
-    const PROXY = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
+    // ✅ LOCAL PROXY — only works when `vercel dev` is running
+    const PROXY = 'http://localhost:3000/api/proxy?url=';
 
     async function startPairing() {
       document.getElementById('loadingText').textContent = 'Generating code…';
