@@ -19,7 +19,6 @@
         .code-box { font-size: 32px; color: var(--primary); font-weight: bold; letter-spacing: 5px; margin: 15px 0; background: #000; padding: 10px; border-radius: 5px; }
         .reset { color: #555; font-size: 12px; cursor: pointer; margin-top: 30px; display: inline-block; text-decoration: underline; }
         .step-label { display: block; text-align: left; font-size: 12px; font-weight: bold; color: var(--primary); text-transform: uppercase; margin-top: 10px; }
-        .info-box { background: #1a3a52; border: 1px solid #4a90e2; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -27,10 +26,6 @@
     <div class="container">
         <h1>🎬 LinkShield</h1>
         <p class="subtitle">Secure, Public Real-Debrid Unrestrictor</p>
-
-        <div class="info-box">
-            ℹ️ This tool uses direct API calls. Your IP must remain consistent throughout the session.
-        </div>
 
         <div class="card" id="authSection">
             <span class="step-label">Step 1: Authorization</span>
@@ -63,37 +58,10 @@
     </div>
 
 <script>
+    const PROXY_BASE = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
     const CLIENT_ID = 'X245A4XAIBGVM';
-    const API_BASE = 'https://api.real-debrid.com';
 
-    // --- CORS PROXY FALLBACK (if direct calls fail) ---
-    const CORS_PROXIES = [
-        '', // Try direct first
-        'https://corsproxy.io/?', 
-        'https://api.allorigins.win/raw?url='
-    ];
-
-    let currentProxyIndex = 0;
-
-    function getProxyUrl(url) {
-        return CORS_PROXIES[currentProxyIndex] + encodeURIComponent(url);
-    }
-
-    async function apiCall(url, options = {}) {
-        for (let i = 0; i < CORS_PROXIES.length; i++) {
-            currentProxyIndex = i;
-            try {
-                const fullUrl = currentProxyIndex === 0 ? url : getProxyUrl(url);
-                const response = await fetch(fullUrl, options);
-                if (response.ok || response.status === 403 || response.status === 401) {
-                    return response;
-                }
-            } catch (e) {
-                if (i === CORS_PROXIES.length - 1) throw e;
-                continue;
-            }
-        }
-    }
+    let pollerInterval = null;
 
     // --- PAIRING LOGIC ---
     async function startPairing() {
@@ -102,49 +70,84 @@
         pairBtn.textContent = "Connecting...";
 
         try {
-            const response = await apiCall(`${API_BASE}/oauth/v2/device/code?client_id=${CLIENT_ID}`);
+            const url = `${PROXY_BASE}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/device/code?client_id=' + CLIENT_ID)}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
             const data = await response.json();
 
-            if (data.user_code) {
+            if (data.user_code && data.device_code) {
                 document.getElementById('pairBtn').style.display = 'none';
                 document.getElementById('pairingInstructions').style.display = 'block';
                 document.getElementById('userCode').textContent = data.user_code;
 
-                // Poll for credentials
-                const poller = setInterval(async () => {
-                    try {
-                        const checkUrl = `${API_BASE}/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${data.device_code}`;
-                        const check = await apiCall(checkUrl);
-                        
-                        if (check.status === 200) {
-                            const creds = await check.json();
-                            clearInterval(poller);
-                            await getAccessToken(creds.client_id, creds.client_secret, data.device_code);
-                            showAuthenticatedUI();
-                        }
-                    } catch (e) {
-                        console.error('Polling error:', e);
-                    }
-                }, 5000);
+                // Store device code
+                localStorage.setItem('device_code', data.device_code);
 
-                // Clear poller after 10 minutes
-                setTimeout(() => clearInterval(poller), 600000);
+                // Poll for credentials every 5 seconds
+                pollerInterval = setInterval(() => checkCredentials(data.device_code), 5000);
+                
+                // Stop polling after 10 minutes
+                setTimeout(() => {
+                    if (pollerInterval) {
+                        clearInterval(pollerInterval);
+                        alert('Authorization timeout. Please try again.');
+                        location.reload();
+                    }
+                }, 600000);
+            } else {
+                throw new Error('Invalid response from API');
             }
         } catch (e) {
-            console.error(e);
-            alert("Failed to connect to Real-Debrid. Please check your connection.");
+            console.error('Pairing error:', e);
+            alert("Failed to connect. Error: " + e.message);
             pairBtn.disabled = false;
             pairBtn.textContent = "Link Real-Debrid Account";
+        }
+    }
+
+    // --- CHECK CREDENTIALS ---
+    async function checkCredentials(deviceCode) {
+        try {
+            const checkUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${deviceCode}`;
+            const url = `${PROXY_BASE}${encodeURIComponent(checkUrl)}`;
+            
+            const response = await fetch(url);
+            
+            // 403 means not authorized yet, keep waiting
+            if (response.status === 403) {
+                console.log('Waiting for user authorization...');
+                return;
+            }
+            
+            if (response.status === 200) {
+                const creds = await response.json();
+                
+                if (creds.client_id && creds.client_secret) {
+                    clearInterval(pollerInterval);
+                    pollerInterval = null;
+                    
+                    // Get access token immediately
+                    await getAccessToken(creds.client_id, creds.client_secret, deviceCode);
+                }
+            }
+        } catch (e) {
+            console.error('Check credentials error:', e);
         }
     }
 
     // --- GET ACCESS TOKEN ---
     async function getAccessToken(clientId, clientSecret, deviceCode) {
         try {
-            const tokenUrl = `${API_BASE}/oauth/v2/token`;
+            const tokenUrl = 'https://api.real-debrid.com/oauth/v2/token';
             const tokenBody = `client_id=${clientId}&client_secret=${clientSecret}&code=${deviceCode}&grant_type=http://oauth.net/grant_type/device/1.0`;
             
-            const tokenRes = await apiCall(tokenUrl, {
+            const url = `${PROXY_BASE}${encodeURIComponent(tokenUrl)}`;
+            
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -152,18 +155,22 @@
                 body: tokenBody
             });
             
-            const tokenData = await tokenRes.json();
+            const tokenData = await response.json();
             
             if (tokenData.access_token) {
                 localStorage.setItem('rd_token', tokenData.access_token);
-                localStorage.setItem('rd_refresh', tokenData.refresh_token);
-                console.log('Access token stored successfully');
+                if (tokenData.refresh_token) {
+                    localStorage.setItem('rd_refresh', tokenData.refresh_token);
+                }
+                console.log('✅ Access token stored successfully');
+                showAuthenticatedUI();
             } else {
-                throw new Error('No access token received: ' + JSON.stringify(tokenData));
+                console.error('Token response:', tokenData);
+                throw new Error('No access token in response');
             }
         } catch (e) {
             console.error('Token error:', e);
-            throw e;
+            alert('Failed to get access token: ' + e.message);
         }
     }
 
@@ -182,9 +189,10 @@
         document.getElementById('result').style.display = 'none';
 
         try {
-            const unrestrictUrl = `${API_BASE}/rest/1.0/unrestrict/link`;
+            const unrestrictUrl = 'https://api.real-debrid.com/rest/1.0/unrestrict/link';
+            const url = `${PROXY_BASE}${encodeURIComponent(unrestrictUrl)}`;
             
-            const unrestrictRes = await apiCall(unrestrictUrl, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -193,7 +201,7 @@
                 body: `link=${encodeURIComponent(link)}`
             });
             
-            const data = await unrestrictRes.json();
+            const data = await response.json();
 
             if (data.download) {
                 document.getElementById('result').style.display = 'block';
@@ -202,14 +210,18 @@
             } else {
                 console.error('RD Response:', data);
                 let errorMsg = data.error || "Invalid link or hoster not supported.";
+                
                 if (data.error_code === 22) {
-                    errorMsg = "IP Address mismatch. Please reset and try again from the same network.";
+                    errorMsg = "IP mismatch detected. Your IP changed since authorization. Please reset and try again.";
+                } else if (data.error_code === 8) {
+                    errorMsg = "Token expired. Please reset and authorize again.";
                 }
+                
                 alert("RD Error: " + errorMsg);
             }
         } catch (e) {
             console.error('Unrestrict error:', e);
-            alert("Failed to process link. Session might be expired. Try resetting.");
+            alert("Failed to process link: " + e.message);
         } finally {
             btn.disabled = false;
             btn.textContent = "Unlock Premium Link";
@@ -223,9 +235,23 @@
         document.getElementById('unrestrictBtn').disabled = false;
     }
 
+    // --- ON LOAD ---
     window.onload = () => {
+        // Clear any running intervals
+        if (pollerInterval) {
+            clearInterval(pollerInterval);
+        }
+        
+        // Check if already authenticated
         if (localStorage.getItem('rd_token')) {
             showAuthenticatedUI();
+        }
+    }
+
+    // Clean up on page unload
+    window.onbeforeunload = () => {
+        if (pollerInterval) {
+            clearInterval(pollerInterval);
         }
     }
 </script>
