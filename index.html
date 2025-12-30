@@ -8,88 +8,123 @@
     :root { --gold: #FFD700; --green: #4ade80; --dark: #0f0f0f; }
     body { background: var(--dark); color: white; font-family: sans-serif; padding: 20px; }
     .container { max-width: 560px; margin: 0 auto; }
-    input, button { width: 100%; padding: 14px; border-radius: 10px; background: #1a1a1a; color: white; border: 1px solid #333; }
-    button { background: var(--gold); color: black; font-weight: bold; margin-top: 10px; }
+    input, button { width: 100%; padding: 14px; border-radius: 10px; background: #1a1a1a; color: white; border: 1px solid #333; outline: none; }
+    button { background: var(--gold); color: black; font-weight: bold; margin-top: 10px; cursor: pointer; border: none; }
+    button:disabled { background: #444; cursor: not-allowed; }
     #result { margin-top: 20px; background: #1a1a1a; padding: 18px; border-radius: 12px; display: none; }
-    .stream-link { background: #000; padding: 12px; border-radius: 8px; font-family: monospace; word-break: break-all; }
+    .stream-link { background: #000; padding: 12px; border-radius: 8px; font-family: monospace; word-break: break-all; margin-top: 10px; border: 1px solid #333; }
+    a { color: var(--gold); text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎬 LinkShield</h1>
     <button id="pairBtn" onclick="startPairing()">🔗 Pair with Real-Debrid</button>
-    <div id="codeDisplay" style="display:none; margin:20px 0; text-align:center; font-size:32px; color:var(--gold)"></div>
+    <div id="codeDisplay" style="display:none; margin:20px 0; text-align:center; font-size:32px; color:var(--gold); font-weight:bold;"></div>
     <div id="codeInstr" style="display:none; text-align:center; color:#aaa; margin-bottom:20px"></div>
 
     <div>
       <label>Paste hoster link (cached)</label>
-      <input id="link" value="https://1fichier.com/?q7w8e9r0t1y2u3i4o5p6">
+      <input id="link" placeholder="https://1fichier.com/..." value="https://1fichier.com/?q7w8e9r0t1y2u3i4o5p6">
       <button id="checkBtn" disabled onclick="checkLink()">CallCheck</button>
     </div>
     <div id="result"></div>
   </div>
 
   <script>
-    // 🔐 TOS-Compliant: Open-source client ID (no secret exposed)
     const CLIENT_ID = 'X245A4XAIBGVM';
     const PROXY = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
 
     async function startPairing() {
-      const res = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`)}`);
-      const { user_code, verification_url, device_code, interval } = await res.json();
-      document.getElementById('codeDisplay').textContent = user_code;
-      document.getElementById('codeDisplay').style.display = 'block';
-      document.getElementById('codeInstr').innerHTML = `Go to: <a href="${verification_url}" target="_blank">${verification_url}</a><br>Enter code → Approve`;
-      document.getElementById('codeInstr').style.display = 'block';
+      const pairBtn = document.getElementById('pairBtn');
+      pairBtn.disabled = true;
+      pairBtn.textContent = "Requesting Code...";
 
-      // Poll for credentials
-      const poll = async () => {
-        const r = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`)}`);
-        if (r.ok) {
-          const { client_id, client_secret } = await r.json();
-          localStorage.setItem('rd_client_id', client_id);
-          localStorage.setItem('rd_client_secret', client_secret);
-          localStorage.setItem('rd_device_code', device_code);
-          document.getElementById('checkBtn').disabled = false;
-          document.getElementById('codeInstr').innerHTML = '✅ Paired!';
-        } else setTimeout(poll, interval * 1000);
-      };
-      poll();
+      try {
+        const res = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`)}`);
+        const data = await res.json();
+        
+        const { user_code, verification_url, device_code, interval } = data;
+        
+        document.getElementById('codeDisplay').textContent = user_code;
+        document.getElementById('codeDisplay').style.display = 'block';
+        document.getElementById('codeInstr').innerHTML = `Go to: <a href="${verification_url}" target="_blank">${verification_url}</a><br>Enter code → Approve`;
+        document.getElementById('codeInstr').style.display = 'block';
+
+        // Poll for credentials
+        const pollInterval = setInterval(async () => {
+          const r = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`)}`);
+          
+          if (r.status === 200) {
+            const creds = await r.json();
+            clearInterval(pollInterval);
+            localStorage.setItem('rd_client_id', creds.client_id);
+            localStorage.setItem('rd_client_secret', creds.client_secret);
+            localStorage.setItem('rd_device_code', device_code);
+            
+            document.getElementById('checkBtn').disabled = false;
+            document.getElementById('codeInstr').innerHTML = '<b style="color:var(--green)">✅ Paired Successfully!</b>';
+            pairBtn.textContent = "Linked ✅";
+          }
+        }, (interval || 5) * 1000);
+
+      } catch (err) {
+        alert("Pairing failed: " + err.message);
+        pairBtn.disabled = false;
+      }
     }
 
     async function checkLink() {
+      const resultDiv = document.getElementById('result');
+      const checkBtn = document.getElementById('checkBtn');
       const link = document.getElementById('link').value.trim();
-      const client_id = localStorage.getItem('rd_client_id');
-      const client_secret = localStorage.getItem('rd_client_secret');
-      const device_code = localStorage.getItem('rd_device_code');
+      
+      checkBtn.disabled = true;
+      checkBtn.textContent = "Processing...";
 
-      // Get access token
-      const tokenRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/token')}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `client_id=${client_id}&client_secret=${client_secret}&code=${device_code}&grant_type=http://oauth.net/grant_type/device/1.0`
-      });
-      const { access_token } = await tokenRes.json();
+      try {
+        const client_id = localStorage.getItem('rd_client_id');
+        const client_secret = localStorage.getItem('rd_client_secret');
+        const device_code = localStorage.getItem('rd_device_code');
 
-      // Unrestrict link
-      const unrestrictRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/rest/1.0/unrestrict/link')}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `link=${encodeURIComponent(link)}`
-      });
+        // 1. Get access token
+        const tokenUrl = `https://api.real-debrid.com/oauth/v2/token`;
+        const tokenRes = await fetch(`${PROXY}${encodeURIComponent(tokenUrl)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `client_id=${client_id}&client_secret=${client_secret}&code=${device_code}&grant_type=http://oauth.net/grant_type/device/1.0`
+        });
+        
+        const tokenData = await tokenRes.json();
+        if (!tokenData.access_token) throw new Error("Auth failed. Please pair again.");
 
-      const data = await unrestrictRes.json();
-      if (!data.download) throw new Error(data.error || 'No stream');
+        // 2. Unrestrict link
+        const unrestrictUrl = `https://api.real-debrid.com/rest/1.0/unrestrict/link`;
+        const unrestrictRes = await fetch(`${PROXY}${encodeURIComponent(unrestrictUrl)}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `link=${encodeURIComponent(link)}`
+        });
 
-      document.getElementById('result').innerHTML = `
-        <div style="color:var(--green)">✅ Real — Cached</div>
-        <div class="stream-link">${data.download}</div>
-        <button onclick="window.open('${data.download}')" style="margin-top:10px">▶️ Play</button>
-      `;
-      document.getElementById('result').style.display = 'block';
+        const data = await unrestrictRes.json();
+        if (!data.download) throw new Error(data.error || 'Link not found or not cached.');
+
+        resultDiv.innerHTML = `
+          <div style="color:var(--green); font-weight:bold;">✅ Real-Debrid Cached</div>
+          <div class="stream-link">${data.download}</div>
+          <button onclick="window.open('${data.download}', '_blank')">▶️ Play / Download</button>
+        `;
+        resultDiv.style.display = 'block';
+
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        checkBtn.disabled = false;
+        checkBtn.textContent = "CallCheck";
+      }
     }
   </script>
 </body>
