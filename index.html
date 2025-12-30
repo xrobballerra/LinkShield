@@ -59,7 +59,6 @@
 
 <script>
     // --- CONFIGURATION ---
-    // Make sure this matches your Vercel URL exactly
     const PROXY_BASE = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
     const CLIENT_ID = 'X245A4XAIBGVM';
 
@@ -86,19 +85,47 @@
                     if (check.status === 200) {
                         const creds = await check.json();
                         clearInterval(poller);
-                        localStorage.setItem('rd_creds', JSON.stringify({
-                            id: creds.client_id, 
-                            secret: creds.client_secret, 
-                            code: data.device_code
-                        }));
+                        
+                        // Get access token immediately after successful pairing
+                        await getAccessToken(creds.client_id, creds.client_secret, data.device_code);
                         showAuthenticatedUI();
                     }
                 }, 5000);
             }
         } catch (e) {
+            console.error(e);
             alert("Proxy unreachable. Please check your Vercel deployment.");
             pairBtn.disabled = false;
             pairBtn.textContent = "Link Real-Debrid Account";
+        }
+    }
+
+    // --- GET ACCESS TOKEN ---
+    async function getAccessToken(clientId, clientSecret, deviceCode) {
+        try {
+            const tokenUrl = 'https://api.real-debrid.com/oauth/v2/token';
+            const tokenBody = `client_id=${clientId}&client_secret=${clientSecret}&code=${deviceCode}&grant_type=http://oauth.net/grant_type/device/1.0`;
+            
+            const tokenRes = await fetch(`${PROXY_BASE}${encodeURIComponent(tokenUrl)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: tokenBody
+            });
+            
+            const tokenData = await tokenRes.json();
+            
+            if (tokenData.access_token) {
+                localStorage.setItem('rd_token', tokenData.access_token);
+                localStorage.setItem('rd_refresh', tokenData.refresh_token);
+                console.log('Access token stored successfully');
+            } else {
+                throw new Error('No access token received');
+            }
+        } catch (e) {
+            console.error('Token error:', e);
+            throw e;
         }
     }
 
@@ -107,34 +134,28 @@
         const linkInput = document.getElementById('manualLink');
         const btn = document.getElementById('unrestrictBtn');
         const link = linkInput.value.trim();
-        const auth = JSON.parse(localStorage.getItem('rd_creds'));
+        const token = localStorage.getItem('rd_token');
 
         if (!link) return alert("Please paste a link first.");
+        if (!token) return alert("Not authenticated. Please pair your account first.");
         
         btn.disabled = true;
         btn.textContent = "Bypassing...";
         document.getElementById('result').style.display = 'none';
 
         try {
-            // 1. Exchange Device Code for Access Token
-            const tokenUrl = 'https://api.real-debrid.com/oauth/v2/token';
-            const tokenBody = `client_id=${auth.id}&client_secret=${auth.secret}&code=${auth.code}&grant_type=http://oauth.net/grant_type/device/1.0`;
-            
-            const tokenRes = await fetch(`${PROXY_BASE}${encodeURIComponent(tokenUrl)}`, {
-                method: 'POST',
-                body: tokenBody
-            });
-            const tokenData = await tokenRes.json();
-
-            if (!tokenData.access_token) throw new Error("Auth failed");
-
-            // 2. Unrestrict the link
+            // Unrestrict the link using the stored access token
             const unrestrictUrl = 'https://api.real-debrid.com/rest/1.0/unrestrict/link';
+            
             const unrestrictRes = await fetch(`${PROXY_BASE}${encodeURIComponent(unrestrictUrl)}`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
                 body: `link=${encodeURIComponent(link)}`
             });
+            
             const data = await unrestrictRes.json();
 
             if (data.download) {
@@ -142,9 +163,11 @@
                 document.getElementById('goBtn').onclick = () => window.open(data.download, '_blank');
                 linkInput.value = ""; // Clear input for next link
             } else {
+                console.error('RD Response:', data);
                 alert("RD Error: " + (data.error || "Invalid link or hoster not supported."));
             }
         } catch (e) {
+            console.error('Unrestrict error:', e);
             alert("Failed to process link. Session might be expired. Try resetting.");
         } finally {
             btn.disabled = false;
@@ -160,7 +183,7 @@
     }
 
     window.onload = () => {
-        if (localStorage.getItem('rd_creds')) {
+        if (localStorage.getItem('rd_token')) {
             showAuthenticatedUI();
         }
     }
