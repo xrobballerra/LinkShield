@@ -5,314 +5,91 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LinkShield</title>
   <style>
-    :root { --gold: #FFD700; --green: #4ade80; --dark: #0f0f0f; --gray: #aaa; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--dark);
-      color: white;
-      padding: 20px;
-      line-height: 1.5;
-    }
+    :root { --gold: #FFD700; --green: #4ade80; --dark: #0f0f0f; }
+    body { background: var(--dark); color: white; font-family: sans-serif; padding: 20px; }
     .container { max-width: 560px; margin: 0 auto; }
-    h1 { font-size: 28px; margin: 0; }
-    .tagline { color: var(--gray); font-size: 14px; margin: 4px 0 20px; }
-    .section { margin: 20px 0; }
-    label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--gray); }
-    input, button {
-      width: 100%;
-      padding: 14px;
-      border-radius: 10px;
-      border: 1px solid #333;
-      background: #1a1a1a;
-      color: white;
-      font-size: 16px;
-    }
-    button {
-      background: linear-gradient(135deg, var(--gold), #B8860B);
-      color: black;
-      font-weight: bold;
-      cursor: pointer;
-      border: none;
-      margin-top: 10px;
-    }
-    #pairBtn {
-      background: #4ade80;
-      color: black;
-      font-weight: bold;
-      padding: 16px;
-      font-size: 18px;
-    }
-    #loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; flex-direction: column; }
-    .reel { width: 60px; height: 60px; border: 4px solid var(--gold); border-radius: 50%; animation: spin 2s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .reel-label { margin-top: 14px; color: var(--gray); font-size: 14px; }
-    #result { margin-top: 20px; background: #1a1a1a; border-radius: 12px; padding: 18px; display: none; }
-    .status { color: var(--green); margin-bottom: 14px; }
-    .stream-link { background: #000; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 14px; word-break: break-all; margin: 12px 0; }
-    .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-    .btn { flex: 1; padding: 12px; border-radius: 8px; font-weight: 600; text-align: center; cursor: pointer; }
-    .play-btn { background: var(--gold); color: black; }
-    .copy-btn { background: #333; }
-    .footer { margin-top: 40px; font-size: 13px; color: #666; }
-    .footer a { color: var(--gold); }
-    .code-display {
-      background: #000;
-      padding: 24px;
-      border-radius: 12px;
-      font-family: monospace;
-      font-size: 48px;
-      text-align: center;
-      margin: 20px 0;
-      letter-spacing: 12px;
-      color: var(--gold);
-      display: none;
-      box-shadow: 0 0 12px rgba(255,215,0,0.6);
-      text-shadow: 0 0 8px rgba(255,215,0,0.8);
-    }
-    .code-instructions {
-      font-size: 15px;
-      color: var(--gray);
-      margin: 12px 0;
-      text-align: center;
-      line-height: 1.6;
-    }
-    .code-instructions a {
-      color: var(--gold);
-      text-decoration: none;
-    }
-    .success-message {
-      color: var(--green);
-      font-weight: bold;
-      font-size: 16px;
-      margin-top: 8px;
-    }
+    input, button { width: 100%; padding: 14px; border-radius: 10px; background: #1a1a1a; color: white; border: 1px solid #333; }
+    button { background: var(--gold); color: black; font-weight: bold; margin-top: 10px; }
+    #result { margin-top: 20px; background: #1a1a1a; padding: 18px; border-radius: 12px; display: none; }
+    .stream-link { background: #000; padding: 12px; border-radius: 8px; font-family: monospace; word-break: break-all; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎬 LinkShield</h1>
-    <p class="tagline">Skip ads, waits, and captchas. Turn file hoster links into instant HD streams — no extra software.</p>
+    <button id="pairBtn" onclick="startPairing()">🔗 Pair with Real-Debrid</button>
+    <div id="codeDisplay" style="display:none; margin:20px 0; text-align:center; font-size:32px; color:var(--gold)"></div>
+    <div id="codeInstr" style="display:none; text-align:center; color:#aaa; margin-bottom:20px"></div>
 
-    <!-- Pairing Section -->
-    <div class="section">
-      <button id="pairBtn" onclick="startPairing()">🔗 Pair with Real-Debrid</button>
-      <div id="codeDisplay" class="code-display"></div>
-      <div id="codeInstructions" class="code-instructions"></div>
+    <div>
+      <label>Paste hoster link (cached)</label>
+      <input id="link" value="https://1fichier.com/?q7w8e9r0t1y2u3i4o5p6">
+      <button id="checkBtn" disabled onclick="checkLink()">CallCheck</button>
     </div>
-
-    <!-- Hoster Link -->
-    <div class="section">
-      <label>Paste a hoster link</label>
-      <input type="text" id="hosterLink" value="https://uptobox.com/6x4r7q1n9m2p">
-      <button onclick="startCheck()" id="callCheckBtn" disabled>CallCheck</button>
-    </div>
-
-    <!-- Loading -->
-    <div id="loading">
-      <div class="reel"></div>
-      <div class="reel-label" id="loadingText">Generating code…</div>
-    </div>
-
-    <!-- Result -->
     <div id="result"></div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <p>🛡️ Your pairing is stored locally. We never receive your data.</p>
-      <p><a href="#" onclick="savePage()">📥 Save this page to run offline</a></p>
-    </div>
   </div>
 
   <script>
-    // 🔑 Reset state for clean test
-    localStorage.removeItem('rd_paired');
-    localStorage.removeItem('rd_client_id');
-    localStorage.removeItem('rd_client_secret');
-
+    // 🔐 TOS-Compliant: Open-source client ID (no secret exposed)
     const CLIENT_ID = 'X245A4XAIBGVM';
-    // ✅ REMOTE PROXY — NO PC. WORKS 24/7.
     const PROXY = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
 
     async function startPairing() {
-      document.getElementById('loadingText').textContent = 'Generating code…';
-      document.getElementById('loading').style.display = 'flex';
-      document.getElementById('codeInstructions').style.display = 'none';
+      const res = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`)}`);
+      const { user_code, verification_url, device_code, interval } = await res.json();
+      document.getElementById('codeDisplay').textContent = user_code;
+      document.getElementById('codeDisplay').style.display = 'block';
+      document.getElementById('codeInstr').innerHTML = `Go to: <a href="${verification_url}" target="_blank">${verification_url}</a><br>Enter code → Approve`;
+      document.getElementById('codeInstr').style.display = 'block';
 
-      try {
-        const rdUrl = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
-        const encodedUrl = encodeURIComponent(rdUrl);
-        const res = await fetch(`${PROXY}${encodedUrl}`);
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`HTTP ${res.status}: ${text.substring(0, 80)}`);
-        }
-
-        const { user_code, verification_url, device_code, interval } = await res.json();
-
-        window.__device_code = device_code;
-        window.__interval = interval;
-
-        // ✅ Show code — and keep it visible
-        document.getElementById('codeDisplay').textContent = user_code;
-        document.getElementById('codeDisplay').style.display = 'block';
-
-        document.getElementById('codeInstructions').innerHTML = `
-          ✅ Your pairing code:<br>
-          ➡️ Go to: <a href="${verification_url}" target="_blank">real-debrid.com/device</a><br>
-          ➡️ Log in → Enter the code → Approve “LinkShield”
-        `;
-        document.getElementById('codeInstructions').style.display = 'block';
-
-        window.open(verification_url, '_blank');
-        pollForApproval();
-
-      } catch (e) {
-        document.getElementById('loading').style.display = 'none';
-        alert(`❌ ${e.message}`);
-        console.error('Pairing failed:', e);
-      }
-    }
-
-    async function pollForApproval() {
-      const device_code = window.__device_code;
-      const interval = window.__interval || 5;
-      let attempts = 0;
-      const maxAttempts = 60;
-
+      // Poll for credentials
       const poll = async () => {
-        if (attempts >= maxAttempts) {
-          document.getElementById('loading').style.display = 'none';
-          alert('❌ Pairing timed out. Try again.');
-          return;
-        }
-
-        try {
-          const rdUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`;
-          const encodedUrl = encodeURIComponent(rdUrl);
-          const res = await fetch(`${PROXY}${encodedUrl}`);
-          if (res.ok) {
-            const { client_id, client_secret } = await res.json();
-
-            localStorage.setItem('rd_paired', 'true');
-            localStorage.setItem('rd_client_id', client_id);
-            localStorage.setItem('rd_client_secret', client_secret);
-
-            // ✅ Hide loading only
-            document.getElementById('loading').style.display = 'none';
-
-            // ✅ Keep code visible — prepend ✅
-            document.getElementById('codeDisplay').innerHTML = `
-              <span style="color: #4ade80; font-size: 32px;">✅</span> ${document.getElementById('codeDisplay').textContent}
-            `;
-
-            // ✅ Update instructions only
-            document.getElementById('codeInstructions').innerHTML = `
-              <div class="success-message">✅ Paired with Real-Debrid!</div>
-              Now paste a link and click “CallCheck”.
-            `;
-            document.getElementById('callCheckBtn').disabled = false;
-            return;
-          }
-        } catch (e) {
-          // ignore transient errors
-        }
-
-        attempts++;
-        setTimeout(poll, interval * 1000);
+        const r = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`)}`);
+        if (r.ok) {
+          const { client_id, client_secret } = await r.json();
+          localStorage.setItem('rd_client_id', client_id);
+          localStorage.setItem('rd_client_secret', client_secret);
+          localStorage.setItem('rd_device_code', device_code);
+          document.getElementById('checkBtn').disabled = false;
+          document.getElementById('codeInstr').innerHTML = '✅ Paired!';
+        } else setTimeout(poll, interval * 1000);
       };
-
       poll();
     }
 
-    async function startCheck() {
-      const link = document.getElementById('hosterLink').value.trim();
-      if (!link) { alert('⚠️ Enter a hoster link'); return; }
-      if (!localStorage.getItem('rd_paired')) {
-        alert('🔒 First, click “Pair with Real-Debrid”');
-        return;
-      }
+    async function checkLink() {
+      const link = document.getElementById('link').value.trim();
+      const client_id = localStorage.getItem('rd_client_id');
+      const client_secret = localStorage.getItem('rd_client_secret');
+      const device_code = localStorage.getItem('rd_device_code');
 
-      document.getElementById('loadingText').textContent = 'Scanning cache…';
-      document.getElementById('loading').style.display = 'flex';
+      // Get access token
+      const tokenRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/token')}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `client_id=${client_id}&client_secret=${client_secret}&code=${device_code}&grant_type=http://oauth.net/grant_type/device/1.0`
+      });
+      const { access_token } = await tokenRes.json();
 
-      try {
-        // Get stored credentials
-        const client_id = localStorage.getItem('rd_client_id');
-        const client_secret = localStorage.getItem('rd_client_secret');
-        const device_code = window.__device_code;
+      // Unrestrict link
+      const unrestrictRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/rest/1.0/unrestrict/link')}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `link=${encodeURIComponent(link)}`
+      });
 
-        // Step 1: Exchange device_code for access_token
-        const tokenUrl = `https://api.real-debrid.com/oauth/v2/token`;
-        const encodedTokenUrl = encodeURIComponent(tokenUrl);
+      const data = await unrestrictRes.json();
+      if (!data.download) throw new Error(data.error || 'No stream');
 
-        const formData = new URLSearchParams();
-        formData.append('client_id', client_id);
-        formData.append('client_secret', client_secret);
-        formData.append('code', device_code);
-        formData.append('grant_type', 'http://oauth.net/grant_type/device/1.0');
-
-        const tokenRes = await fetch(`${PROXY}${encodedTokenUrl}`, {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!tokenRes.ok) {
-          const err = await tokenRes.json();
-          throw new Error(err.error || `Token: HTTP ${tokenRes.status}`);
-        }
-
-        const { access_token } = await tokenRes.json();
-
-        // Step 2: Unrestrict the link
-        const unrestrictUrl = `https://api.real-debrid.com/rest/1.0/unrestrict/link`;
-        const encodedUnrestrictUrl = encodeURIComponent(unrestrictUrl);
-
-        const unrestrictRes = await fetch(`${PROXY}${encodedUnrestrictUrl}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${access_token}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: `link=${encodeURIComponent(link)}`
-        });
-
-        if (!unrestrictRes.ok) {
-          const err = await unrestrictRes.json();
-          throw new Error(err.error || `Unrestrict: HTTP ${unrestrictRes.status}`);
-        }
-
-        const data = await unrestrictRes.json();
-
-        if (!data.download) {
-          throw new Error('No direct link. File may not be cached.');
-        }
-
-        // ✅ Show REAL stream URL
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('result').innerHTML = `
-          <div class="status">✅ Real — Cached (${data.cached_time || 'fresh'})</div>
-          <div class="stream-link">${data.download}</div>
-          <div class="btn-group">
-            <div class="btn play-btn" onclick="window.open('${data.download}', '_blank')">▶️ Play</div>
-            <div class="btn copy-btn" onclick="copy('${data.download}')">📋 Copy</div>
-          </div>
-        `;
-        document.getElementById('result').style.display = 'block';
-
-      } catch (err) {
-        document.getElementById('loading').style.display = 'none';
-        alert(`❌ ${err.message}`);
-        console.error('CallCheck error:', err);
-      }
-    }
-
-    function copy(url) {
-      navigator.clipboard.writeText(url).then(() => alert('📋 Copied!')).catch(() => alert('⚠️ Copy failed'));
-    }
-
-    function savePage() {
-      alert('✅ To save LinkShield:\n\n1. Right-click → Save as…\n2. Name: LinkShield.html\n3. Double-click to run (UI works offline; internet needed for pairing & streaming)');
+      document.getElementById('result').innerHTML = `
+        <div style="color:var(--green)">✅ Real — Cached</div>
+        <div class="stream-link">${data.download}</div>
+        <button onclick="window.open('${data.download}')" style="margin-top:10px">▶️ Play</button>
+      `;
+      document.getElementById('result').style.display = 'block';
     }
   </script>
 </body>
