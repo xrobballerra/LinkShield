@@ -1,150 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LinkShield Multi-Hoster</title>
-  <style>
-    :root { --gold: #FFD700; --green: #4ade80; --dark: #0f0f0f; --error: #ff4d4d; }
-    body { background: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; padding: 20px; line-height: 1.6; }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 { text-align: center; color: var(--gold); letter-spacing: 1px; }
-    
-    .card { background: #161616; padding: 20px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; }
-    input, button { width: 100%; padding: 14px; border-radius: 8px; background: #0a0a0a; color: white; border: 1px solid #444; font-size: 15px; outline: none; box-sizing: border-box; }
-    
-    button { background: var(--gold); color: black; font-weight: bold; margin-top: 10px; cursor: pointer; border: none; transition: 0.3s; }
-    button:hover { filter: brightness(1.2); }
-    button:disabled { background: #333; color: #777; cursor: not-allowed; }
-    
-    #result { margin-top: 20px; display: none; border-left: 4px solid var(--green); }
-    .stream-link { background: #000; padding: 12px; border-radius: 6px; font-family: monospace; word-break: break-all; margin: 10px 0; border: 1px solid #222; font-size: 13px; color: var(--green); }
-    .hoster-tag { font-size: 10px; text-transform: uppercase; background: #333; padding: 2px 6px; border-radius: 4px; color: #ccc; margin-bottom: 10px; display: inline-block; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkShield | Premium Unrestrictor</title>
+    <style>
+        :root { --gold: #FFD700; --green: #4ade80; --dark: #0a0a0a; --card: #161616; }
+        body { background: var(--dark); color: white; font-family: 'Inter', sans-serif; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 480px; }
+        .card { background: var(--card); border: 1px solid #222; padding: 24px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: var(--gold); text-align: center; font-size: 28px; margin-bottom: 30px; letter-spacing: -1px; }
+        
+        label { display: block; font-size: 11px; color: #666; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+        input { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: white; border-radius: 10px; box-sizing: border-box; font-size: 14px; margin-bottom: 12px; transition: 0.2s; }
+        input:focus { border-color: var(--gold); }
+        
+        button { width: 100%; padding: 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; }
+        .btn-gold { background: var(--gold); color: black; }
+        .btn-gold:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .btn-gold:disabled { background: #222; color: #555; cursor: not-allowed; transform: none; }
+        
+        #result { display: none; margin-top: 20px; border-top: 1px solid #333; padding-top: 20px; }
+        .dl-box { background: #000; padding: 15px; border-radius: 10px; word-break: break-all; font-family: 'Courier New', monospace; font-size: 12px; border: 1px solid #333; margin: 12px 0; color: var(--green); }
+        
+        .pairing-box { display: none; text-align: center; padding: 20px; border: 2px dashed #333; border-radius: 12px; margin-top: 15px; }
+        #userCode { font-size: 38px; color: var(--gold); font-weight: 900; margin: 10px 0; }
+        .logout-link { display: block; text-align: center; color: #444; font-size: 11px; margin-top: 20px; text-decoration: none; cursor: pointer; }
+    </style>
 </head>
 <body>
-  <div class="container">
+
+<div class="container">
     <h1>🎬 LinkShield</h1>
-    
-    <div class="card">
-      <button id="pairBtn" onclick="startPairing()">🔗 Link Real-Debrid Account</button>
-      <div id="pairingBox" style="display:none; margin-top:15px; text-align:center;">
-        <div id="codeDisplay" style="font-size:40px; color:var(--gold); font-weight:bold;">----</div>
-        <p id="codeInstr" style="color:#888; font-size:13px;"></p>
-      </div>
+
+    <div id="authSection" class="card">
+        <button id="pairBtn" class="btn-gold" onclick="startPairing()">🔗 Link Real-Debrid Account</button>
+        <div id="pairingInfo" class="pairing-box">
+            <div id="userCode">----</div>
+            <p id="instr" style="font-size:12px; color:#888;"></p>
+        </div>
     </div>
 
     <div class="card">
-      <label style="color:#888; font-size:12px;">Paste Any Supported Link (1fichier, Rapidgator, etc.)</label>
-      <input id="link" placeholder="https://hoster.com/file/..." autocomplete="off">
-      <button id="checkBtn" disabled onclick="checkLink()">Bypass Restrictions</button>
+        <label>Enter any supported link</label>
+        <input type="text" id="manualLink" placeholder="https://1fichier.com/?... or similar">
+        <button id="unrestrictBtn" class="btn-gold" disabled onclick="handleUnrestrict()">Bypass Restriction</button>
+        
+        <div id="result">
+            <div id="fileName" style="font-size: 14px; font-weight: bold; margin-bottom: 4px;"></div>
+            <div class="dl-box" id="finalUrl"></div>
+            <button class="btn-gold" style="background:var(--green)" id="goBtn">🚀 Open/Download</button>
+        </div>
     </div>
 
-    <div id="result" class="card">
-      <div id="hosterInfo" class="hoster-tag">Detecting Hoster...</div>
-      <div style="font-weight:bold; color:var(--green);">✅ Link Unrestricted</div>
-      <div id="filename" style="font-size:13px; color:#aaa; margin-top:5px;"></div>
-      <div class="stream-link" id="finalLink"></div>
-      <button id="dlBtn" style="background:var(--green); color:black;">🚀 Download / Stream</button>
-    </div>
-  </div>
+    <span class="logout-link" onclick="logout()">Reset Application Session</span>
+</div>
 
-  <script>
+<script>
     const CLIENT_ID = 'X245A4XAIBGVM';
     const PROXY = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
 
-    // UI Helpers
-    const updateUI = (id, text) => document.getElementById(id).textContent = text;
-
+    // Pairing Logic
     async function startPairing() {
-      const pairBtn = document.getElementById('pairBtn');
-      pairBtn.disabled = true;
-      pairBtn.textContent = "Connecting to API...";
+        const btn = document.getElementById('pairBtn');
+        btn.disabled = true;
+        btn.textContent = "Connecting...";
 
-      try {
-        const res = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`)}`);
-        const data = await res.json();
-        
-        document.getElementById('pairingBox').style.display = 'block';
-        updateUI('codeDisplay', data.user_code);
-        document.getElementById('codeInstr').innerHTML = `Visit <a href="${data.verification_url}" target="_blank" style="color:var(--gold)">real-debrid.com/device</a> and enter the code above.`;
+        try {
+            const res = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`)}`);
+            const data = await res.json();
 
-        const poll = setInterval(async () => {
-          const pollRes = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${data.device_code}`)}`);
-          if (pollRes.status === 200) {
-            const creds = await pollRes.json();
-            clearInterval(poll);
-            localStorage.setItem('rd_session', JSON.stringify({ id: creds.client_id, secret: creds.client_secret, device: data.device_code }));
-            location.reload(); // Refresh to enable main UI
-          }
-        }, 5000);
-      } catch (e) {
-        pairBtn.disabled = false;
-        alert("Setup failed. Check your proxy.");
-      }
+            document.getElementById('pairingInfo').style.display = 'block';
+            document.getElementById('userCode').textContent = data.user_code;
+            document.getElementById('instr').innerHTML = `Visit <a href="${data.verification_url}" target="_blank" style="color:var(--gold)">real-debrid.com/device</a> and enter the code.`;
+
+            const poller = setInterval(async () => {
+                const check = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${data.device_code}`)}`);
+                if (check.status === 200) {
+                    const creds = await check.json();
+                    clearInterval(poller);
+                    localStorage.setItem('rd_auth', JSON.stringify({
+                        id: creds.client_id,
+                        secret: creds.client_secret,
+                        device: data.device_code
+                    }));
+                    location.reload();
+                }
+            }, 5000);
+        } catch (e) {
+            alert("Connection error. Check your proxy URL.");
+            btn.disabled = false;
+        }
     }
 
-    async function checkLink() {
-      const btn = document.getElementById('checkBtn');
-      const input = document.getElementById('link').value.trim();
-      const session = JSON.parse(localStorage.getItem('rd_session'));
-      
-      if (!input) return alert("Please paste a link first.");
-      
-      btn.disabled = true;
-      btn.textContent = "Unlocking...";
-      document.getElementById('result').style.display = 'none';
+    // Unrestrict Logic
+    async function handleUnrestrict() {
+        const link = document.getElementById('manualLink').value.trim();
+        const btn = document.getElementById('unrestrictBtn');
+        const auth = JSON.parse(localStorage.getItem('rd_auth'));
 
-      try {
-        // 1. Refresh Access Token
-        const tParams = new URLSearchParams({
-          client_id: session.id,
-          client_secret: session.secret,
-          code: session.device,
-          grant_type: 'http://oauth.net/grant_type/device/1.0'
-        });
+        if (!link) return alert("Please paste a link first!");
 
-        const tRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/token')}`, {
-          method: 'POST',
-          body: tParams.toString()
-        });
-        const tData = await tRes.json();
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+        document.getElementById('result').style.display = 'none';
 
-        // 2. Unrestrict the Link (Works for all hosters)
-        const unParams = new URLSearchParams({ link: input });
-        const unRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/rest/1.0/unrestrict/link')}`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${tData.access_token}` },
-          body: unParams.toString()
-        });
-        
-        const data = await unRes.json();
+        try {
+            // STEP 1: Exchange code for Token (Fixes 400 error)
+            const tokenBody = `client_id=${auth.id}&client_secret=${auth.secret}&code=${auth.device}&grant_type=http://oauth.net/grant_type/device/1.0`;
+            
+            const tokenRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/token')}`, {
+                method: 'POST',
+                body: tokenBody
+            });
+            const tokenData = await tokenRes.json();
 
-        if (data.download) {
-          document.getElementById('result').style.display = 'block';
-          updateUI('hosterInfo', data.host.toUpperCase());
-          updateUI('filename', data.filename);
-          updateUI('finalLink', data.download);
-          document.getElementById('dlBtn').onclick = () => window.open(data.download, '_blank');
-        } else {
-          alert("Error: " + (data.error || "Hoster not supported or link offline."));
+            if (!tokenData.access_token) throw new Error("Auth Token Failed. Please re-pair.");
+
+            // STEP 2: Unrestrict link (Fixes 401 error)
+            const unRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/rest/1.0/unrestrict/link')}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
+                body: `link=${encodeURIComponent(link)}`
+            });
+            const data = await unRes.json();
+
+            if (data.download) {
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('fileName').textContent = data.filename;
+                document.getElementById('finalUrl').textContent = data.download;
+                document.getElementById('goBtn').onclick = () => window.open(data.download, '_blank');
+            } else {
+                alert("Real-Debrid Error: " + (data.error || "Invalid Link"));
+            }
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Bypass Restriction";
         }
-      } catch (err) {
-        alert("Critical Error: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Bypass Restrictions";
-      }
+    }
+
+    function logout() {
+        localStorage.removeItem('rd_auth');
+        location.reload();
     }
 
     window.onload = () => {
-      if(localStorage.getItem('rd_session')) {
-        document.getElementById('checkBtn').disabled = false;
-        document.getElementById('pairBtn').textContent = "Account Connected ✅";
-        document.getElementById('pairBtn').style.background = "#222";
-        document.getElementById('pairBtn').style.color = "#888";
-      }
+        if (localStorage.getItem('rd_auth')) {
+            document.getElementById('unrestrictBtn').disabled = false;
+            document.getElementById('pairBtn').textContent = "Real-Debrid Linked ✅";
+            document.getElementById('pairBtn').disabled = true;
+        }
     };
-  </script>
+</script>
+
 </body>
 </html>
