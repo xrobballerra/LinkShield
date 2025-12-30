@@ -8,11 +8,11 @@
     :root { --gold: #FFD700; --green: #4ade80; --dark: #0f0f0f; }
     body { background: var(--dark); color: white; font-family: sans-serif; padding: 20px; }
     .container { max-width: 560px; margin: 0 auto; }
-    input, button { width: 100%; padding: 14px; border-radius: 10px; background: #1a1a1a; color: white; border: 1px solid #333; outline: none; }
+    input, button { width: 100%; padding: 14px; border-radius: 10px; background: #1a1a1a; color: white; border: 1px solid #333; outline: none; box-sizing: border-box; }
     button { background: var(--gold); color: black; font-weight: bold; margin-top: 10px; cursor: pointer; border: none; }
-    button:disabled { background: #444; cursor: not-allowed; }
-    #result { margin-top: 20px; background: #1a1a1a; padding: 18px; border-radius: 12px; display: none; }
-    .stream-link { background: #000; padding: 12px; border-radius: 8px; font-family: monospace; word-break: break-all; margin-top: 10px; border: 1px solid #333; }
+    button:disabled { background: #444; cursor: not-allowed; color: #888; }
+    #result { margin-top: 20px; background: #1a1a1a; padding: 18px; border-radius: 12px; display: none; border: 1px solid #333; }
+    .stream-link { background: #000; padding: 12px; border-radius: 8px; font-family: monospace; word-break: break-all; margin-top: 10px; border: 1px solid #222; }
     a { color: var(--gold); text-decoration: none; }
   </style>
 </head>
@@ -20,12 +20,15 @@
   <div class="container">
     <h1>🎬 LinkShield</h1>
     <button id="pairBtn" onclick="startPairing()">🔗 Pair with Real-Debrid</button>
-    <div id="codeDisplay" style="display:none; margin:20px 0; text-align:center; font-size:32px; color:var(--gold); font-weight:bold;"></div>
-    <div id="codeInstr" style="display:none; text-align:center; color:#aaa; margin-bottom:20px"></div>
+    
+    <div id="pairingBox" style="display:none; background:#1a1a1a; padding:20px; border-radius:10px; margin:20px 0; text-align:center; border:1px dashed var(--gold);">
+      <div id="codeDisplay" style="font-size:36px; color:var(--gold); font-weight:bold; margin-bottom:10px;"></div>
+      <div id="codeInstr" style="color:#aaa; font-size:14px;"></div>
+    </div>
 
-    <div>
-      <label>Paste hoster link (cached)</label>
-      <input id="link" placeholder="https://1fichier.com/..." value="https://1fichier.com/?q7w8e9r0t1y2u3i4o5p6">
+    <div style="margin-top:20px;">
+      <label style="color:#888; font-size:12px; display:block; margin-bottom:5px;">Hoster Link</label>
+      <input id="link" placeholder="https://..." value="https://1fichier.com/?q7w8e9r0t1y2u3i4o5p6">
       <button id="checkBtn" disabled onclick="checkLink()">CallCheck</button>
     </div>
     <div id="result"></div>
@@ -38,94 +41,100 @@
     async function startPairing() {
       const pairBtn = document.getElementById('pairBtn');
       pairBtn.disabled = true;
-      pairBtn.textContent = "Requesting Code...";
+      pairBtn.textContent = "Connecting...";
 
       try {
-        const res = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`)}`);
+        const url = `https://api.real-debrid.com/oauth/v2/device/code?client_id=${CLIENT_ID}`;
+        const res = await fetch(`${PROXY}${encodeURIComponent(url)}`);
         const data = await res.json();
         
-        const { user_code, verification_url, device_code, interval } = data;
-        
-        document.getElementById('codeDisplay').textContent = user_code;
-        document.getElementById('codeDisplay').style.display = 'block';
-        document.getElementById('codeInstr').innerHTML = `Go to: <a href="${verification_url}" target="_blank">${verification_url}</a><br>Enter code → Approve`;
-        document.getElementById('codeInstr').style.display = 'block';
+        document.getElementById('pairingBox').style.display = 'block';
+        document.getElementById('codeDisplay').textContent = data.user_code;
+        document.getElementById('codeInstr').innerHTML = `Go to <a href="${data.verification_url}" target="_blank">real-debrid.com/device</a> and enter the code.`;
 
-        // Poll for credentials
-        const pollInterval = setInterval(async () => {
-          const r = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${device_code}`)}`);
+        const interval = setInterval(async () => {
+          const checkUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${data.device_code}`;
+          const pollRes = await fetch(`${PROXY}${encodeURIComponent(checkUrl)}`);
           
-          if (r.status === 200) {
-            const creds = await r.json();
-            clearInterval(pollInterval);
-            localStorage.setItem('rd_client_id', creds.client_id);
-            localStorage.setItem('rd_client_secret', creds.client_secret);
-            localStorage.setItem('rd_device_code', device_code);
-            
-            document.getElementById('checkBtn').disabled = false;
-            document.getElementById('codeInstr').innerHTML = '<b style="color:var(--green)">✅ Paired Successfully!</b>';
-            pairBtn.textContent = "Linked ✅";
+          if (pollRes.status === 200) {
+            const creds = await pollRes.json();
+            clearInterval(interval);
+            localStorage.setItem('rd_creds', JSON.stringify({
+              id: creds.client_id,
+              secret: creds.client_secret,
+              code: data.device_code
+            }));
+            finishPairing();
           }
-        }, (interval || 5) * 1000);
-
+          // Note: 403 Forbidden here is normal until you approve the code.
+        }, 5000);
       } catch (err) {
-        alert("Pairing failed: " + err.message);
         pairBtn.disabled = false;
+        pairBtn.textContent = "Error - Try Again";
       }
+    }
+
+    function finishPairing() {
+      document.getElementById('pairingBox').style.display = 'none';
+      document.getElementById('checkBtn').disabled = false;
+      document.getElementById('pairBtn').textContent = "Linked ✅";
     }
 
     async function checkLink() {
-      const resultDiv = document.getElementById('result');
-      const checkBtn = document.getElementById('checkBtn');
-      const link = document.getElementById('link').value.trim();
-      
-      checkBtn.disabled = true;
-      checkBtn.textContent = "Processing...";
+      const btn = document.getElementById('checkBtn');
+      const resDiv = document.getElementById('result');
+      const linkVal = document.getElementById('link').value.trim();
+      const creds = JSON.parse(localStorage.getItem('rd_creds'));
+
+      btn.disabled = true;
+      btn.textContent = "Processing...";
 
       try {
-        const client_id = localStorage.getItem('rd_client_id');
-        const client_secret = localStorage.getItem('rd_client_secret');
-        const device_code = localStorage.getItem('rd_device_code');
+        // 1. Get Access Token
+        const tokenParams = new URLSearchParams({
+          client_id: creds.id,
+          client_secret: creds.secret,
+          code: creds.code,
+          grant_type: 'http://oauth.net/grant_type/device/1.0'
+        });
 
-        // 1. Get access token
-        const tokenUrl = `https://api.real-debrid.com/oauth/v2/token`;
-        const tokenRes = await fetch(`${PROXY}${encodeURIComponent(tokenUrl)}`, {
+        const tRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/token')}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `client_id=${client_id}&client_secret=${client_secret}&code=${device_code}&grant_type=http://oauth.net/grant_type/device/1.0`
+          body: tokenParams.toString()
         });
-        
-        const tokenData = await tokenRes.json();
-        if (!tokenData.access_token) throw new Error("Auth failed. Please pair again.");
+        const tData = await tRes.json();
+        if (!tData.access_token) throw new Error("Auth failed");
 
-        // 2. Unrestrict link
-        const unrestrictUrl = `https://api.real-debrid.com/rest/1.0/unrestrict/link`;
-        const unrestrictRes = await fetch(`${PROXY}${encodeURIComponent(unrestrictUrl)}`, {
+        // 2. Unrestrict
+        const unParams = new URLSearchParams({ link: linkVal });
+        const unRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/rest/1.0/unrestrict/link')}`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
+          headers: { 
+            'Authorization': `Bearer ${tData.access_token}`,
             'Content-Type': 'application/x-www-form-urlencoded'
           },
-          body: `link=${encodeURIComponent(link)}`
+          body: unParams.toString()
         });
+        const data = await unRes.json();
 
-        const data = await unrestrictRes.json();
-        if (!data.download) throw new Error(data.error || 'Link not found or not cached.');
-
-        resultDiv.innerHTML = `
-          <div style="color:var(--green); font-weight:bold;">✅ Real-Debrid Cached</div>
-          <div class="stream-link">${data.download}</div>
-          <button onclick="window.open('${data.download}', '_blank')">▶️ Play / Download</button>
-        `;
-        resultDiv.style.display = 'block';
-
+        if (data.download) {
+          resDiv.innerHTML = `<div style="color:var(--green)">✅ Success!</div><div class="stream-link">${data.download}</div>`;
+          resDiv.style.display = 'block';
+        } else {
+          throw new Error(data.error || "Unrestrict failed");
+        }
       } catch (err) {
-        alert("Error: " + err.message);
+        alert("CallCheck Error: " + err.message);
       } finally {
-        checkBtn.disabled = false;
-        checkBtn.textContent = "CallCheck";
+        btn.disabled = false;
+        btn.textContent = "CallCheck";
       }
     }
+
+    window.onload = () => {
+      if(localStorage.getItem('rd_creds')) finishPairing();
+    };
   </script>
 </body>
 </html>
