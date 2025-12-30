@@ -2,107 +2,166 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LinkShield | WORKING</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkShield | Public Unrestrictor</title>
     <style>
-        body { background: #0f0f0f; color: #eee; font-family: sans-serif; padding: 40px; text-align: center; }
-        .card { background: #1a1a1a; border: 1px solid #333; padding: 25px; border-radius: 15px; max-width: 400px; margin: 0 auto 20px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #FFD700; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        button:disabled { background: #444; color: #888; }
-        #result { margin-top: 20px; padding: 15px; background: #000; border: 1px solid #4ade80; display: none; word-break: break-all; }
-        .reset { color: #555; font-size: 11px; cursor: pointer; margin-top: 20px; display: block; }
+        :root { --primary: #FFD700; --bg: #0f0f0f; --card: #1a1a1a; --text: #eee; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; text-align: center; line-height: 1.6; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card { background: var(--card); border: 1px solid #333; padding: 25px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: var(--primary); margin-bottom: 5px; }
+        p.subtitle { color: #888; font-size: 14px; margin-bottom: 25px; }
+        input { width: 100%; padding: 14px; margin: 10px 0; background: #000; border: 1px solid #444; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 14px; background: var(--primary); border: none; font-weight: bold; cursor: pointer; border-radius: 8px; font-size: 16px; transition: transform 0.2s, background 0.2s; }
+        button:hover { background: #e6c200; transform: translateY(-1px); }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        #result { margin-top: 20px; padding: 15px; background: #052c14; border: 1px solid #4ade80; border-radius: 8px; display: none; }
+        .code-box { font-size: 32px; color: var(--primary); font-weight: bold; letter-spacing: 5px; margin: 15px 0; background: #000; padding: 10px; border-radius: 5px; }
+        .reset { color: #555; font-size: 12px; cursor: pointer; margin-top: 30px; display: inline-block; text-decoration: underline; }
+        .step-label { display: block; text-align: left; font-size: 12px; font-weight: bold; color: var(--primary); text-transform: uppercase; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>🎬 LinkShield</h1>
+    <div class="container">
+        <h1>🎬 LinkShield</h1>
+        <p class="subtitle">Secure, Public Real-Debrid Unrestrictor</p>
 
-    <div class="card" id="authBox">
-        <button id="pairBtn" onclick="startPairing()">1. Link Real-Debrid</button>
-        <div id="codeDisplay" style="display:none; margin-top:15px;">
-            <div id="userCode" style="font-size:30px; color:#FFD700; font-weight:bold;">----</div>
-            <p id="instr" style="font-size:12px; color:#888;"></p>
+        <div class="card" id="authSection">
+            <span class="step-label">Step 1: Authorization</span>
+            <button id="pairBtn" onclick="startPairing()">Link Real-Debrid Account</button>
+            
+            <div id="pairingInstructions" style="display:none;">
+                <p style="font-size: 14px; margin-bottom: 5px;">Enter this code at:</p>
+                <a href="https://real-debrid.com/device" target="_blank" style="color: #4ade80; font-weight: bold;">real-debrid.com/device</a>
+                <div id="userCode" class="code-box">----</div>
+                <p id="timer" style="font-size: 12px; color: #888;">Waiting for authorization...</p>
+            </div>
+            
+            <div id="authSuccess" style="display:none; color: #4ade80; font-weight: bold;">
+                Account Linked Successfully ✅
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <label>2. Paste Link</label>
-        <input type="text" id="manualLink" placeholder="Paste hoster link here...">
-        <button id="unrestrictBtn" disabled onclick="handleUnrestrict()">Bypass Restriction</button>
-        <div id="result">
-            <p style="color:#4ade80; margin-top:0;">✅ Success!</p>
-            <div id="finalUrl" style="font-family:monospace; font-size:12px; margin-bottom:10px;"></div>
-            <button style="background:#4ade80" id="goBtn">Download Now</button>
+        <div class="card">
+            <span class="step-label">Step 2: Paste Link</span>
+            <input type="text" id="manualLink" placeholder="e.g. https://1fichier.com/?...">
+            <button id="unrestrictBtn" disabled onclick="handleUnrestrict()">Unlock Premium Link</button>
+            
+            <div id="result">
+                <p style="color:#4ade80; margin: 0 0 10px 0; font-weight: bold;">Link Ready!</p>
+                <button style="background:#4ade80; color: #000;" id="goBtn">🚀 Download Now</button>
+            </div>
         </div>
-    </div>
 
-    <span class="reset" onclick="localStorage.clear(); location.reload();">Reset Everything</span>
+        <span class="reset" onclick="localStorage.clear(); location.reload();">Reset Session & Clear Data</span>
+    </div>
 
 <script>
-    const PROXY = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
+    // --- CONFIGURATION ---
+    // Make sure this matches your Vercel URL exactly
+    const PROXY_BASE = 'https://linkshield-proxy.vercel.app/api/proxy?url=';
     const CLIENT_ID = 'X245A4XAIBGVM';
 
+    // --- PAIRING LOGIC ---
     async function startPairing() {
-        const btn = document.getElementById('pairBtn');
-        btn.textContent = "Connecting...";
-        try {
-            const res = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/device/code?client_id=' + CLIENT_ID)}`);
-            const data = await res.json();
-            document.getElementById('codeDisplay').style.display = 'block';
-            document.getElementById('userCode').textContent = data.user_code;
-            document.getElementById('instr').innerHTML = `Go to <b>real-debrid.com/device</b>`;
+        const pairBtn = document.getElementById('pairBtn');
+        pairBtn.disabled = true;
+        pairBtn.textContent = "Connecting...";
 
-            const poller = setInterval(async () => {
-                const check = await fetch(`${PROXY}${encodeURIComponent(`https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${data.device_code}`)}`);
-                if (check.status === 200) {
-                    const creds = await check.json();
-                    clearInterval(poller);
-                    localStorage.setItem('rd_creds', JSON.stringify({id: creds.client_id, secret: creds.client_secret, code: data.device_code}));
-                    location.reload();
-                }
-            }, 5000);
-        } catch(e) { alert("Proxy error. Check URL."); }
+        try {
+            const response = await fetch(`${PROXY_BASE}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/device/code?client_id=' + CLIENT_ID)}`);
+            const data = await response.json();
+
+            if (data.user_code) {
+                document.getElementById('pairBtn').style.display = 'none';
+                document.getElementById('pairingInstructions').style.display = 'block';
+                document.getElementById('userCode').textContent = data.user_code;
+
+                // Poll for credentials
+                const poller = setInterval(async () => {
+                    const checkUrl = `https://api.real-debrid.com/oauth/v2/device/credentials?client_id=${CLIENT_ID}&code=${data.device_code}`;
+                    const check = await fetch(`${PROXY_BASE}${encodeURIComponent(checkUrl)}`);
+                    
+                    if (check.status === 200) {
+                        const creds = await check.json();
+                        clearInterval(poller);
+                        localStorage.setItem('rd_creds', JSON.stringify({
+                            id: creds.client_id, 
+                            secret: creds.client_secret, 
+                            code: data.device_code
+                        }));
+                        showAuthenticatedUI();
+                    }
+                }, 5000);
+            }
+        } catch (e) {
+            alert("Proxy unreachable. Please check your Vercel deployment.");
+            pairBtn.disabled = false;
+            pairBtn.textContent = "Link Real-Debrid Account";
+        }
     }
 
+    // --- UNRESTRICT LOGIC ---
     async function handleUnrestrict() {
-        const link = document.getElementById('manualLink').value.trim();
-        const auth = JSON.parse(localStorage.getItem('rd_creds'));
+        const linkInput = document.getElementById('manualLink');
         const btn = document.getElementById('unrestrictBtn');
-        if(!link) return;
+        const link = linkInput.value.trim();
+        const auth = JSON.parse(localStorage.getItem('rd_creds'));
 
-        btn.disabled = true; btn.textContent = "Processing...";
+        if (!link) return alert("Please paste a link first.");
+        
+        btn.disabled = true;
+        btn.textContent = "Bypassing...";
+        document.getElementById('result').style.display = 'none';
 
         try {
-            // STEP 1: Get Token
-            const tBody = `client_id=${auth.id}&client_secret=${auth.secret}&code=${auth.code}&grant_type=http://oauth.net/grant_type/device/1.0`;
-            const tRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/oauth/v2/token')}`, {
+            // 1. Exchange Device Code for Access Token
+            const tokenUrl = 'https://api.real-debrid.com/oauth/v2/token';
+            const tokenBody = `client_id=${auth.id}&client_secret=${auth.secret}&code=${auth.code}&grant_type=http://oauth.net/grant_type/device/1.0`;
+            
+            const tokenRes = await fetch(`${PROXY_BASE}${encodeURIComponent(tokenUrl)}`, {
                 method: 'POST',
-                body: tBody
+                body: tokenBody
             });
-            const tData = await tRes.json();
+            const tokenData = await tokenRes.json();
 
-            // STEP 2: Unrestrict
-            const unRes = await fetch(`${PROXY}${encodeURIComponent('https://api.real-debrid.com/rest/1.0/unrestrict/link')}`, {
+            if (!tokenData.access_token) throw new Error("Auth failed");
+
+            // 2. Unrestrict the link
+            const unrestrictUrl = 'https://api.real-debrid.com/rest/1.0/unrestrict/link';
+            const unrestrictRes = await fetch(`${PROXY_BASE}${encodeURIComponent(unrestrictUrl)}`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${tData.access_token}` },
+                headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
                 body: `link=${encodeURIComponent(link)}`
             });
-            const data = await unRes.json();
+            const data = await unrestrictRes.json();
 
-            if(data.download) {
+            if (data.download) {
                 document.getElementById('result').style.display = 'block';
-                document.getElementById('finalUrl').textContent = data.download;
                 document.getElementById('goBtn').onclick = () => window.open(data.download, '_blank');
-            } else { alert("RD Error: " + (data.error || "Check link")); }
-        } catch(e) { alert("Request failed."); }
-        finally { btn.disabled = false; btn.textContent = "Bypass Restriction"; }
+                linkInput.value = ""; // Clear input for next link
+            } else {
+                alert("RD Error: " + (data.error || "Invalid link or hoster not supported."));
+            }
+        } catch (e) {
+            alert("Failed to process link. Session might be expired. Try resetting.");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Unlock Premium Link";
+        }
+    }
+
+    function showAuthenticatedUI() {
+        document.getElementById('pairingInstructions').style.display = 'none';
+        document.getElementById('pairBtn').style.display = 'none';
+        document.getElementById('authSuccess').style.display = 'block';
+        document.getElementById('unrestrictBtn').disabled = false;
     }
 
     window.onload = () => {
-        if(localStorage.getItem('rd_creds')) {
-            document.getElementById('unrestrictBtn').disabled = false;
-            document.getElementById('pairBtn').textContent = "Account Linked ✅";
-            document.getElementById('pairBtn').disabled = true;
+        if (localStorage.getItem('rd_creds')) {
+            showAuthenticatedUI();
         }
     }
 </script>
